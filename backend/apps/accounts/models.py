@@ -7,12 +7,6 @@ import uuid
 
 class User(AbstractBaseUser, PermissionsMixin):
 
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-    )
-
     full_name = models.CharField(
         max_length=255
     )

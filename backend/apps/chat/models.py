@@ -2,15 +2,8 @@ from django.db import models
 
 from apps.accounts.models import User
 from apps.properties.models import PropertyListing
-import uuid
 
 class Conversation(models.Model):
-
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-    )
 
     property_listing = models.ForeignKey(
         PropertyListing,
@@ -40,11 +33,7 @@ class Conversation(models.Model):
 
 class Message(models.Model):
 
-    id = models.CharField(
-        primary_key=True,
-        max_length=50
-    )
-
+    
     conversation = models.ForeignKey(
         Conversation,
         on_delete=models.CASCADE,
