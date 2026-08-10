@@ -5,33 +5,106 @@ from .models import Conversation, Message
 from .serializers import (
     ConversationSerializer,
     MessageSerializer,
-    
 )
 
 
-class ConversationListView(generics.ListCreateAPIView):
+# ============================================================
+# CONVERSATIONS
+# ============================================================
 
-    queryset = Conversation.objects.all()
+class ConversationListCreateView(generics.ListCreateAPIView):
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
 
-class ConversationDetailView(generics.RetrieveUpdateDestroyAPIView):
+        return (
+            Conversation.objects
+            .filter(
+                customer=user
+            ) |
+            Conversation.objects.filter(
+                owner=user
+            )
+        ).select_related(
+            "property_listing",
+            "property_listing__property",
+            "customer",
+            "owner",
+        ).distinct()
 
-    queryset = Conversation.objects.all()
+    def perform_create(self, serializer):
+        serializer.save()
+
+
+class ConversationDetailView(generics.RetrieveAPIView):
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
 
-class MessageListView(generics.ListCreateAPIView):
+        return (
+            Conversation.objects
+            .filter(
+                customer=user
+            ) |
+            Conversation.objects.filter(
+                owner=user
+            )
+        ).select_related(
+            "property_listing",
+            "property_listing__property",
+            "customer",
+            "owner",
+        ).distinct()
 
-    queryset = Message.objects.all()
+
+# ============================================================
+# MESSAGES
+# ============================================================
+
+class MessageListCreateView(generics.ListCreateAPIView):
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        return (
+            Message.objects
+            .filter(
+                conversation__customer=user
+            ) |
+            Message.objects.filter(
+                conversation__owner=user
+            )
+        ).select_related(
+            "conversation",
+            "sender",
+        ).order_by("created_at")
+
+    def perform_create(self, serializer):
+        serializer.save()
 
 
 class MessageDetailView(generics.RetrieveUpdateDestroyAPIView):
-
-    queryset = Message.objects.all()
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        return (
+            Message.objects
+            .filter(
+                conversation__customer=user
+            ) |
+            Message.objects.filter(
+                conversation__owner=user
+            )
+        ).select_related(
+            "conversation",
+            "sender",
+        )
