@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 
 from .managers import UserManager
-import uuid
+
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -17,6 +17,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
 
     email = models.EmailField(
+        unique=True,
         blank=True,
         null=True
     )

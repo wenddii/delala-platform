@@ -1,14 +1,7 @@
 from django.db import models
-
-import uuid
+from apps.accounts.models import User
 
 class PropertyType(models.Model):
-
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-    )
 
     name = models.CharField(
         max_length=100
@@ -19,12 +12,6 @@ class PropertyType(models.Model):
 
 
 class Location(models.Model):
-
-    id = models.CharField(
-        primary_key=True,
-        max_length=50
-    )
-
     city = models.CharField(
         max_length=100
     )
@@ -51,23 +38,29 @@ class Location(models.Model):
         blank=True
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "city",
+                    "sub_city",
+                    "woreda",
+                    "neighborhood",
+                ],
+                name="unique_location_combination",
+            )
+        ]
 
     def __str__(self):
-        return f"{self.city} - {self.neighborhood}"
+        return f"{self.sub_city} - Woreda {self.woreda} - {self.neighborhood}"
 
 
 
-from django.db import models
-from apps.accounts.models import User
+
 
 
 class Property(models.Model):
-
-    id = models.CharField(
-        primary_key=True,
-        max_length=50
-    )
-
+    
     owner = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -109,12 +102,7 @@ class Property(models.Model):
 
 
 class PropertyListing(models.Model):
-
-    id = models.CharField(
-        primary_key=True,
-        max_length=50
-    )
-
+    
     property = models.ForeignKey(
         Property,
         on_delete=models.CASCADE,
@@ -168,11 +156,6 @@ class PropertyListing(models.Model):
 
 class PropertyImage(models.Model):
 
-    id = models.CharField(
-        primary_key=True,
-        max_length=50
-    )
-
     property = models.ForeignKey(
         Property,
         on_delete=models.CASCADE,
@@ -196,11 +179,7 @@ class PropertyImage(models.Model):
 
 class PropertyDocument(models.Model):
 
-    id = models.CharField(
-        primary_key=True,
-        max_length=50
-    )
-
+    
     property = models.ForeignKey(
         Property,
         on_delete=models.CASCADE,
@@ -226,11 +205,6 @@ from apps.accounts.models import User
 
 
 class PropertyVerification(models.Model):
-
-    id = models.CharField(
-        primary_key=True,
-        max_length=50
-    )
 
     property = models.OneToOneField(
         Property,
@@ -263,11 +237,6 @@ class PropertyVerification(models.Model):
 
         
 class Favorite(models.Model):
-
-    id = models.CharField(
-        primary_key=True,
-        max_length=50
-    )
 
     user = models.ForeignKey(
         User,
