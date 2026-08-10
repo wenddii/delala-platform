@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import (
     PropertyType,
@@ -12,8 +13,13 @@ from .models import (
 )
 
 
+# ============================================================
+# PROPERTY TYPE
+# ============================================================
+
 @admin.register(PropertyType)
 class PropertyTypeAdmin(admin.ModelAdmin):
+
     list_display = (
         "id",
         "name",
@@ -24,8 +30,13 @@ class PropertyTypeAdmin(admin.ModelAdmin):
     )
 
 
+# ============================================================
+# LOCATION
+# ============================================================
+
 @admin.register(Location)
 class LocationAdmin(admin.ModelAdmin):
+
     list_display = (
         "id",
         "city",
@@ -50,8 +61,13 @@ class LocationAdmin(admin.ModelAdmin):
     )
 
 
+# ============================================================
+# PROPERTY
+# ============================================================
+
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
+
     list_display = (
         "id",
         "owner",
@@ -90,8 +106,13 @@ class PropertyAdmin(admin.ModelAdmin):
     )
 
 
+# ============================================================
+# PROPERTY LISTING
+# ============================================================
+
 @admin.register(PropertyListing)
 class PropertyListingAdmin(admin.ModelAdmin):
+
     list_display = (
         "id",
         "title",
@@ -129,8 +150,13 @@ class PropertyListingAdmin(admin.ModelAdmin):
     )
 
 
+# ============================================================
+# PROPERTY IMAGE
+# ============================================================
+
 @admin.register(PropertyImage)
 class PropertyImageAdmin(admin.ModelAdmin):
+
     list_display = (
         "id",
         "property",
@@ -157,8 +183,13 @@ class PropertyImageAdmin(admin.ModelAdmin):
     )
 
 
+# ============================================================
+# PROPERTY DOCUMENT
+# ============================================================
+
 @admin.register(PropertyDocument)
 class PropertyDocumentAdmin(admin.ModelAdmin):
+
     list_display = (
         "id",
         "property",
@@ -183,7 +214,50 @@ class PropertyDocumentAdmin(admin.ModelAdmin):
 
     readonly_fields = (
         "uploaded_at",
+        "document_preview",
     )
+
+    fields = (
+        "property",
+        "document_type",
+        "document",
+        "document_preview",
+        "uploaded_at",
+    )
+
+    @admin.display(description="Document Preview")
+    def document_preview(self, obj):
+
+        if not obj or not obj.document:
+            return "No document uploaded."
+
+        return format_html(
+            """
+            <div>
+                <img
+                    src="{}"
+                    style="
+                        max-width: 500px;
+                        max-height: 600px;
+                        object-fit: contain;
+                        border: 1px solid #ddd;
+                        border-radius: 6px;
+                    "
+                >
+                <br><br>
+                <a href="{}" target="_blank">
+                    Open Full Size
+                </a>
+            </div>
+            """,
+            obj.document.url,
+            obj.document.url,
+        )
+
+
+# ============================================================
+# PROPERTY VERIFICATION
+# ============================================================
 
 @admin.register(PropertyVerification)
 class PropertyVerificationAdmin(admin.ModelAdmin):
@@ -239,48 +313,99 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
         ),
     )
 
-    @admin.display(description="Owner")
+    @admin.display(
+        description="Owner"
+    )
     def get_owner(self, obj):
+
         return obj.property.owner.full_name
 
-    @admin.display(description="Property Documents")
+    @admin.display(
+        description="Property Documents"
+    )
     def property_documents(self, obj):
+
+        if not obj or not obj.pk:
+            return "Save the verification record first."
 
         documents = obj.property.documents.all()
 
         if not documents:
             return "No documents uploaded."
 
-        document_links = []
+        document_html = []
 
         for document in documents:
 
-            if document.document:
-                document_links.append(
+            if not document.document:
+                document_html.append(
                     format_html(
-                        '<div style="margin-bottom: 15px;">'
-                        '<strong>{}</strong><br>'
-                        '<a href="{}" target="_blank">'
-                        'Open Document'
-                        '</a>'
-                        '</div>',
-                        document.document_type,
-                        document.document.url,
-                    )
-                )
-            else:
-                document_links.append(
-                    format_html(
-                        '<div><strong>{}</strong>: No file</div>',
+                        """
+                        <div style="margin-bottom: 20px;">
+                            <strong>{}</strong>
+                            <br>
+                            <span>No document file uploaded.</span>
+                        </div>
+                        """,
                         document.document_type,
                     )
                 )
+                continue
 
-        return format_html("".join(document_links))
+            document_html.append(
+                format_html(
+                    """
+                    <div
+                        style="
+                            margin-bottom: 25px;
+                            padding: 15px;
+                            border: 1px solid #ddd;
+                            border-radius: 8px;
+                        "
+                    >
+                        <strong>{}</strong>
 
+                        <br><br>
+
+                        <img
+                            src="{}"
+                            style="
+                                max-width: 600px;
+                                max-height: 700px;
+                                object-fit: contain;
+                                border: 1px solid #ddd;
+                                border-radius: 6px;
+                            "
+                        >
+
+                        <br><br>
+
+                        <a
+                            href="{}"
+                            target="_blank"
+                        >
+                            Open Full Size
+                        </a>
+                    </div>
+                    """,
+                    document.document_type,
+                    document.document.url,
+                    document.document.url,
+                )
+            )
+
+        return format_html(
+            "".join(document_html)
+        )
+
+
+# ============================================================
+# FAVORITE
+# ============================================================
 
 @admin.register(Favorite)
 class FavoriteAdmin(admin.ModelAdmin):
+
     list_display = (
         "id",
         "user",

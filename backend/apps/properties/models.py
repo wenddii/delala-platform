@@ -2,6 +2,10 @@ from django.db import models
 from apps.accounts.models import User
 
 
+# ============================================================
+# PROPERTY TYPE
+# ============================================================
+
 class PropertyType(models.Model):
 
     name = models.CharField(
@@ -12,7 +16,12 @@ class PropertyType(models.Model):
         return self.name
 
 
+# ============================================================
+# LOCATION
+# ============================================================
+
 class Location(models.Model):
+
     city = models.CharField(
         max_length=100
     )
@@ -53,15 +62,19 @@ class Location(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.sub_city} - Woreda {self.woreda} - {self.neighborhood}"
+        return (
+            f"{self.sub_city} - "
+            f"Woreda {self.woreda} - "
+            f"{self.neighborhood}"
+        )
 
 
-
-
-
+# ============================================================
+# PROPERTY
+# ============================================================
 
 class Property(models.Model):
-    
+
     owner = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -96,91 +109,16 @@ class Property(models.Model):
         auto_now=True
     )
 
-
     def __str__(self):
         return self.description[:50]
 
 
-
-class PropertyListing(models.Model):
-    
-    property = models.ForeignKey(
-        Property,
-        on_delete=models.CASCADE,
-        related_name="listings"
-    )
-
-    title = models.CharField(
-        max_length=255
-    )
-
-    listing_type = models.CharField(
-        max_length=50
-    )
-
-    price = models.DecimalField(
-        max_digits=12,
-        decimal_places=2
-    )
-
-    currency = models.CharField(
-        max_length=10,
-        default="ETB"
-    )
-
-    price_period = models.CharField(
-        max_length=50
-    )
-
-    status = models.CharField(
-        max_length=50,
-        default="Draft"
-    )
-
-    published_at = models.DateTimeField(
-        null=True,
-        blank=True
-    )
-
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
-
-    updated_at = models.DateTimeField(
-        auto_now=True
-    )
-
-
-    def __str__(self):
-        return self.title
-        
-
-class PropertyImage(models.Model):
-
-    property = models.ForeignKey(
-        Property,
-        on_delete=models.CASCADE,
-        related_name="images"
-    )
-
-    image_url = models.URLField()
-
-    is_primary = models.BooleanField(
-        default=False
-    )
-
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
-
-    def __str__(self):
-        return f"{self.property.id} Image"
-
-
+# ============================================================
+# PROPERTY DOCUMENT
+# ============================================================
 
 class PropertyDocument(models.Model):
 
-    
     property = models.ForeignKey(
         Property,
         on_delete=models.CASCADE,
@@ -192,9 +130,7 @@ class PropertyDocument(models.Model):
     )
 
     document = models.ImageField(
-        upload_to="property_documents/",
-        null=True,
-        blank=True  
+        upload_to="property_documents/"
     )
 
     uploaded_at = models.DateTimeField(
@@ -204,6 +140,10 @@ class PropertyDocument(models.Model):
     def __str__(self):
         return self.document_type
 
+
+# ============================================================
+# PROPERTY VERIFICATION
+# ============================================================
 
 class PropertyVerification(models.Model):
 
@@ -244,7 +184,105 @@ class PropertyVerification(models.Model):
 
     def __str__(self):
         return f"{self.property.id} - {self.status}"
-        
+
+
+# ============================================================
+# PROPERTY LISTING
+# ============================================================
+
+class PropertyListing(models.Model):
+
+    class ListingType(models.TextChoices):
+        RENT = "rent", "Rent"
+        SALE = "sale", "Sale"
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        PUBLISHED = "published", "Published"
+        UNPUBLISHED = "unpublished", "Unpublished"
+
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.CASCADE,
+        related_name="listings"
+    )
+
+    title = models.CharField(
+        max_length=255
+    )
+
+    listing_type = models.CharField(
+        max_length=50,
+        choices=ListingType.choices
+    )
+
+    price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2
+    )
+
+    currency = models.CharField(
+        max_length=10,
+        default="ETB"
+    )
+
+    price_period = models.CharField(
+        max_length=50
+    )
+
+    status = models.CharField(
+        max_length=50,
+        choices=Status.choices,
+        default=Status.DRAFT
+    )
+
+    published_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    def __str__(self):
+        return self.title
+
+
+# ============================================================
+# PROPERTY IMAGE
+# ============================================================
+
+class PropertyImage(models.Model):
+
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.CASCADE,
+        related_name="images"
+    )
+
+    image_url = models.URLField()
+
+    is_primary = models.BooleanField(
+        default=False
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    def __str__(self):
+        return f"{self.property.id} Image"
+
+
+# ============================================================
+# FAVORITE
+# ============================================================
+
 class Favorite(models.Model):
 
     user = models.ForeignKey(
@@ -264,8 +302,7 @@ class Favorite(models.Model):
     )
 
     def __str__(self):
-        return f"{self.user.phone_number} - {self.property_listing.title}"
-
-
-
-
+        return (
+            f"{self.user.phone_number} - "
+            f"{self.property_listing.title}"
+        )
