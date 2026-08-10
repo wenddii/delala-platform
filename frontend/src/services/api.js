@@ -105,11 +105,17 @@ export function parseDRFError(err) {
   if (typeof data === 'string') return data
   if (data.detail)              return String(data.detail)
   if (data.non_field_errors)    return data.non_field_errors.join(' ')
-  // { field: ['message'] } shape
-  const firstKey = Object.keys(data)[0]
-  if (!firstKey) return 'An unexpected error occurred.'
-  const msg = data[firstKey]
-  return `${firstKey}: ${Array.isArray(msg) ? msg[0] : msg}`
+
+  // { field: ['msg', ...], field2: [...] } — collect ALL field errors, not just the first
+  if (typeof data === 'object' && !Array.isArray(data)) {
+    const lines = Object.entries(data).map(([key, val]) => {
+      const msg = Array.isArray(val) ? val[0] : String(val)
+      return `${key}: ${msg}`
+    })
+    if (lines.length) return lines.join(' · ')
+  }
+
+  return 'An unexpected error occurred.'
 }
 
 export default api

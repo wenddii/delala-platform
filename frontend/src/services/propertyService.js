@@ -26,12 +26,26 @@ export const getPropertyTypes = () =>
 export const getLocations = () =>
   api.get('/api/properties/locations/').then(r => r.data)
 
-// ── Properties (owned — requires auth) ───────────────────────────────────────
+// ── Properties (auth required) ───────────────────────────────────────────────
 // POST /api/properties/properties/   IsAuthenticated
-// Body: { id, owner, property_type, location, bedrooms, bathrooms, area_sqm, description }
-// Note: id is a CharField PK — must be provided by client (use nanoid/uuid in caller)
-export const createProperty = (body) =>
-  api.post('/api/properties/properties/', body).then(r => r.data)
+// The backend creates Property + PropertyDocument + PropertyVerification atomically.
+// Rule 4: must be sent as multipart/form-data because the document is a FileField.
+// Fields: property_type (int), location (int), bedrooms, bathrooms, area_sqm,
+//         description, document_type (str), document (File)
+// Rule 4: owner is set server-side — NEVER include owner in the request.
+export const createProperty = (formData) =>
+  api.post('/api/properties/properties/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(r => r.data)
+
+// PATCH /api/properties/properties/<pk>/   IsAuthenticated
+// Can be JSON for non-file fields; use multipart only when updating the document file.
+export const updateProperty = (pk, body) => {
+  const isFormData = body instanceof FormData
+  return api.patch(`/api/properties/properties/${pk}/`, body, {
+    headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {},
+  }).then(r => r.data)
+}
 
 // GET /api/properties/properties/   IsAuthenticated (returns ALL properties — no owner filter)
 // ⚠️  No ?owner= filter — client must filter by owner id from response
@@ -41,10 +55,6 @@ export const getMyProperties = () =>
 // GET /api/properties/properties/<pk>/   IsAuthenticated
 export const getProperty = (pk) =>
   api.get(`/api/properties/properties/${pk}/`).then(r => r.data)
-
-// PATCH /api/properties/properties/<pk>/   IsAuthenticated
-export const updateProperty = (pk, body) =>
-  api.patch(`/api/properties/properties/${pk}/`, body).then(r => r.data)
 
 // DELETE /api/properties/properties/<pk>/   IsAuthenticated
 export const deleteProperty = (pk) =>
@@ -60,15 +70,6 @@ export const getListings = () =>
 // GET /api/properties/listings/<pk>/   AllowAny
 export const getListing = (pk) =>
   api.get(`/api/properties/listings/${pk}/`).then(r => r.data)
-
-// POST /api/properties/listings/   AllowAny (⚠️ unprotected in backend)
-// Body: { id, property, title, listing_type, price, currency, price_period, status }
-export const createListing = (body) =>
-  api.post('/api/properties/listings/', body).then(r => r.data)
-
-// PATCH /api/properties/listings/<pk>/   IsAuthenticated
-export const updateListing = (pk, body) =>
-  api.patch(`/api/properties/listings/${pk}/`, body).then(r => r.data)
 
 // ── Favorites ────────────────────────────────────────────────────────────────
 // GET /api/properties/favorites/   IsAuthenticated
@@ -98,3 +99,24 @@ export const addPropertyImage = (body) =>
 // ⚠️  document_url is a URLField — no binary upload supported
 export const addPropertyDocument = (body) =>
   api.post('/api/properties/documents/', body).then(r => r.data)
+
+// ── Property Verifications ────────────────────────────────────────────────────
+// GET /api/properties/verifications/   IsAuthenticated
+// Returns: [{ id, property, status, verified_by, verified_at, remarks, created_at }]
+// status values: 'pending' | 'verified' | 'rejected'
+// Rule 5: only staff can change status. Users can only read their own property's status.
+// Rule 6: a property must be 'verified' before a listing can be created for it.
+export const getVerifications = () =>
+  api.get('/api/properties/verifications/').then(r => r.data)
+
+// ── Listings — create (owner-only, verified properties only) ──────────────────
+// POST /api/properties/listings/   IsAuthenticated
+// The backend enforces that the property is verified before allowing listing creation.
+// Body: { id, property, title, listing_type, price, currency, price_period, status }
+// Rule 6: frontend must only offer this flow when verification status === 'verified'
+export const createListing = (body) =>
+  api.post('/api/properties/listings/', body).then(r => r.data)
+
+// PATCH /api/properties/listings/<pk>/   IsAuthenticated
+export const updateListing = (pk, body) =>
+  api.patch(`/api/properties/listings/${pk}/`, body).then(r => r.data)

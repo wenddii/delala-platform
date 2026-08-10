@@ -30,7 +30,7 @@ function normalise(l) {
 export default function PropertyDetail() {
   const { id }     = useParams()
   const navigate   = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   const [property, setProperty] = useState(null)
   const [loading,  setLoading]  = useState(true)
@@ -46,6 +46,14 @@ export default function PropertyDetail() {
       .finally(()  => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [id])
+
+  // Rule 16/20: user cannot contact their own listing's owner
+  const isOwnListing = user && property &&
+    (String(property.owner) === String(user.id) ||
+     String(property.owner?.id) === String(user.id))
+
+  // Rule 11/17: contact is only available on active listings
+  const isActive = property?.status === 'active'
 
   const handleContact = (type) => {
     if (!isAuthenticated) {
@@ -164,20 +172,31 @@ export default function PropertyDetail() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleContact('message')}
-                  className="flex items-center justify-center gap-1.5 py-2.5 bg-ethio-primary text-white text-sm font-semibold rounded-xl hover:bg-ethio-primary-dark transition"
-                >
-                  <MessageCircle size={15} /> Message
-                </button>
-                <button
-                  onClick={() => handleContact('call')}
-                  className="flex items-center justify-center gap-1.5 py-2.5 border border-ethio-border text-ethio-ink text-sm font-semibold rounded-xl hover:border-ethio-primary hover:text-ethio-primary transition"
-                >
-                  <Phone size={15} /> Call
-                </button>
-              </div>
+              {/* Rule 20/21: owner cannot contact themselves */}
+              {isOwnListing ? (
+                <p className="text-center text-xs text-ethio-muted py-2">
+                  This is your listing. Manage it from your <Link to="/profile" className="text-ethio-primary font-semibold underline">profile</Link>.
+                </p>
+              ) : !isActive ? (
+                <p className="text-center text-xs text-ethio-muted py-2">
+                  This listing is not currently available for contact.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleContact('message')}
+                    className="flex items-center justify-center gap-1.5 py-2.5 bg-ethio-primary text-white text-sm font-semibold rounded-xl hover:bg-ethio-primary-dark transition"
+                  >
+                    <MessageCircle size={15} /> Message
+                  </button>
+                  <button
+                    onClick={() => handleContact('call')}
+                    className="flex items-center justify-center gap-1.5 py-2.5 border border-ethio-border text-ethio-ink text-sm font-semibold rounded-xl hover:border-ethio-primary hover:text-ethio-primary transition"
+                  >
+                    <Phone size={15} /> Call
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

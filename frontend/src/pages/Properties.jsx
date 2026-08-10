@@ -43,19 +43,19 @@ export default function Properties() {
     return () => { cancelled = true }
   }, [])
 
-  // Map backend listing fields to what PropertyCard / filters expect.
-  // Backend shape: { id, title, listing_type, price, status, property: { property_type, ... } }
+  // Rule 11: public browse must ONLY show active listings.
+  // 'active' is the only valid published status per the business rules.
   const normalise = (l) => ({
     ...l,
     listing: l.listing_type || l.listing || '',
-    type:    l.property?.property_type || l.type || '',
+    type:    l.property?.property_type?.name || l.property?.property_type || l.type || '',
     loc:     l.property?.location?.neighborhood || l.property?.location?.sub_city || l.loc || '',
     img:     l.primary_image?.image_url || l.img || '',
-    status:  l.status || 'live',
+    status:  l.status || '',
   })
 
   const filtered = listings.map(normalise).filter(p => {
-    if (p.status !== 'active' && p.status !== 'live') return false
+    if (p.status !== 'active') return false   // strict — pending/rejected/inactive never shown
     if (p.listing !== activeTab) return false
     if (typeParam && p.type !== typeParam) return false
     if (qParam) {

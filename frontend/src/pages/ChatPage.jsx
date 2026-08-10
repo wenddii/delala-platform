@@ -64,6 +64,21 @@ export default function ChatPage() {
         const norm = normListing(listingData)
         setListing(norm)
 
+        // Rule 20/21: user cannot start a conversation with themselves
+        const listingOwnerId = listingData.owner || listingData.property?.owner
+        if (String(listingOwnerId) === String(user.id)) {
+          setError('You cannot contact yourself — this is your own listing.')
+          setLoading(false)
+          return
+        }
+
+        // Rule 24: listing must be active before conversations can be created
+        if (listingData.status && listingData.status !== 'active') {
+          setError('This listing is not currently available for messaging.')
+          setLoading(false)
+          return
+        }
+
         // Find existing conversation for this listing, or create one
         const convs = await getConversations()
         const existing = (Array.isArray(convs) ? convs : []).find(
@@ -75,12 +90,10 @@ export default function ChatPage() {
         if (existing) {
           cid = existing.id
         } else {
-          // Create a new conversation
+          // Rule 23: backend derives sender/owner from auth token — never send owner/customer
           const newConv = await createConversation({
             id:               crypto.randomUUID(),
             property_listing: propertyId,
-            customer:         user.id,
-            owner:            listingData.owner || listingData.property?.owner,
           })
           cid = newConv.id
         }
@@ -122,7 +135,7 @@ export default function ChatPage() {
       const saved = await sendMessage({
         id:           crypto.randomUUID(),
         conversation: convId,
-        sender:       user.id,
+        // Rule 23: sender is derived server-side from the auth token — never sent from frontend
         content:      text,
       })
       setMessages(prev => prev.map(m => m.id === optimistic.id ? { ...saved, _sending: false } : m))
