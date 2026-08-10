@@ -1,5 +1,7 @@
 from rest_framework import serializers
+
 from .models import User, UserProfile
+from apps.properties.models import Property
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -27,7 +29,59 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
+class ProfilePropertySerializer(serializers.ModelSerializer):
+
+    property_type_name = serializers.CharField(
+        source="property_type.name",
+        read_only=True
+    )
+
+    location = serializers.SerializerMethodField()
+
+    verification_status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Property
+        fields = [
+            "id",
+            "property_type",
+            "property_type_name",
+            "location",
+            "bedrooms",
+            "bathrooms",
+            "area_sqm",
+            "description",
+            "created_at",
+            "verification_status",
+        ]
+
+        read_only_fields = [
+            "id",
+            "property_type_name",
+            "location",
+            "created_at",
+            "verification_status",
+        ]
+
+    def get_location(self, obj):
+        return {
+            "id": obj.location.id,
+            "city": obj.location.city,
+            "sub_city": obj.location.sub_city,
+            "woreda": obj.location.woreda,
+            "neighborhood": obj.location.neighborhood,
+        }
+
+    def get_verification_status(self, obj):
+        try:
+            return obj.verification.status
+        except Property.verification.RelatedObjectDoesNotExist:
+            return "not_verified"
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
+
+    properties = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
@@ -36,14 +90,23 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "government_id_image",
             "address",
             "bio",
+            "properties",
             "created_at",
             "updated_at",
         ]
 
         read_only_fields = [
+            "properties",
             "created_at",
             "updated_at",
         ]
+
+    def get_properties(self, obj):
+
+        return ProfilePropertySerializer(
+            obj.user.properties.all(),
+            many=True
+        ).data
 
 
 class ProfileSerializer(serializers.ModelSerializer):

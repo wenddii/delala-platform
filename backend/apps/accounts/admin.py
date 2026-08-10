@@ -141,12 +141,14 @@ class UserAdmin(BaseUserAdmin):
     )
 
 
+
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
 
     list_display = (
         "get_full_name",
         "get_phone",
+        "get_property_count",
         "address",
         "created_at",
     )
@@ -162,6 +164,12 @@ class UserProfileAdmin(admin.ModelAdmin):
         "created_at",
     )
 
+    readonly_fields = (
+        "properties_list",
+        "created_at",
+        "updated_at",
+    )
+
     @admin.display(
         ordering="user__full_name",
         description="Full Name"
@@ -175,3 +183,41 @@ class UserProfileAdmin(admin.ModelAdmin):
     )
     def get_phone(self, obj):
         return obj.user.phone_number
+
+    @admin.display(
+        description="Properties"
+    )
+    def get_property_count(self, obj):
+        return obj.user.properties.count()
+
+    @admin.display(
+        description="Uploaded Properties"
+    )
+    def properties_list(self, obj):
+        properties = obj.user.properties.select_related(
+            "property_type",
+            "location",
+            "verification",
+        ).all()
+
+        if not properties:
+            return "No properties uploaded."
+
+        result = []
+
+        for property in properties:
+            try:
+                verification_status = property.verification.status
+            except Property.verification.RelatedObjectDoesNotExist:
+                verification_status = "Not verified"
+
+            result.append(
+                f"#{property.id} | "
+                f"{property.property_type.name} | "
+                f"{property.location} | "
+                f"{property.bedrooms} bedrooms | "
+                f"Verification: {verification_status}"
+            )
+
+        return "\n".join(result)
+

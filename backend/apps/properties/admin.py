@@ -185,24 +185,32 @@ class PropertyDocumentAdmin(admin.ModelAdmin):
         "uploaded_at",
     )
 
-
 @admin.register(PropertyVerification)
 class PropertyVerificationAdmin(admin.ModelAdmin):
+
     list_display = (
         "id",
         "property",
-        "verified_by",
+        "get_owner",
+        "get_location",
         "status",
+        "verified_by",
         "verified_at",
     )
 
     list_filter = (
         "status",
+        "verified_at",
     )
 
     search_fields = (
         "property__description",
+        "property__owner__full_name",
         "property__owner__phone_number",
+        "property__location__city",
+        "property__location__sub_city",
+        "property__location__woreda",
+        "property__location__neighborhood",
         "verified_by__phone_number",
     )
 
@@ -214,6 +222,21 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
     readonly_fields = (
         "verified_at",
     )
+
+    @admin.display(
+        description="Owner",
+        ordering="property__owner__full_name",
+    )
+    def get_owner(self, obj):
+        return obj.property.owner.full_name
+
+    @admin.display(
+        description="Location",
+        ordering="property__location__sub_city",
+    )
+    def get_location(self, obj):
+        return str(obj.property.location)
+
 
 
 @admin.register(Favorite)
