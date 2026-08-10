@@ -163,7 +163,7 @@ class PropertyDocumentAdmin(admin.ModelAdmin):
         "id",
         "property",
         "document_type",
-        "document_url",
+        "document",
         "uploaded_at",
     )
 
@@ -189,10 +189,8 @@ class PropertyDocumentAdmin(admin.ModelAdmin):
 class PropertyVerificationAdmin(admin.ModelAdmin):
 
     list_display = (
-        "id",
         "property",
         "get_owner",
-        "get_location",
         "status",
         "verified_by",
         "verified_at",
@@ -200,18 +198,12 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
 
     list_filter = (
         "status",
-        "verified_at",
     )
 
     search_fields = (
         "property__description",
-        "property__owner__full_name",
         "property__owner__phone_number",
-        "property__location__city",
-        "property__location__sub_city",
-        "property__location__woreda",
-        "property__location__neighborhood",
-        "verified_by__phone_number",
+        "property__owner__full_name",
     )
 
     autocomplete_fields = (
@@ -220,23 +212,71 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
     )
 
     readonly_fields = (
+        "property_documents",
         "verified_at",
     )
 
-    @admin.display(
-        description="Owner",
-        ordering="property__owner__full_name",
+    fieldsets = (
+        (
+            "Property",
+            {
+                "fields": (
+                    "property",
+                    "property_documents",
+                )
+            },
+        ),
+        (
+            "Verification",
+            {
+                "fields": (
+                    "status",
+                    "remarks",
+                    "verified_by",
+                    "verified_at",
+                )
+            },
+        ),
     )
+
+    @admin.display(description="Owner")
     def get_owner(self, obj):
         return obj.property.owner.full_name
 
-    @admin.display(
-        description="Location",
-        ordering="property__location__sub_city",
-    )
-    def get_location(self, obj):
-        return str(obj.property.location)
+    @admin.display(description="Property Documents")
+    def property_documents(self, obj):
 
+        documents = obj.property.documents.all()
+
+        if not documents:
+            return "No documents uploaded."
+
+        document_links = []
+
+        for document in documents:
+
+            if document.document:
+                document_links.append(
+                    format_html(
+                        '<div style="margin-bottom: 15px;">'
+                        '<strong>{}</strong><br>'
+                        '<a href="{}" target="_blank">'
+                        'Open Document'
+                        '</a>'
+                        '</div>',
+                        document.document_type,
+                        document.document.url,
+                    )
+                )
+            else:
+                document_links.append(
+                    format_html(
+                        '<div><strong>{}</strong>: No file</div>',
+                        document.document_type,
+                    )
+                )
+
+        return format_html("".join(document_links))
 
 
 @admin.register(Favorite)

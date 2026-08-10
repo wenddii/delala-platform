@@ -1,6 +1,7 @@
 from django.db import models
 from apps.accounts.models import User
 
+
 class PropertyType(models.Model):
 
     name = models.CharField(
@@ -190,7 +191,11 @@ class PropertyDocument(models.Model):
         max_length=100
     )
 
-    document_url = models.URLField()
+    document = models.ImageField(
+        upload_to="property_documents/",
+        null=True,
+        blank=True  
+    )
 
     uploaded_at = models.DateTimeField(
         auto_now_add=True
@@ -200,11 +205,12 @@ class PropertyDocument(models.Model):
         return self.document_type
 
 
-
-from apps.accounts.models import User
-
-
 class PropertyVerification(models.Model):
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        VERIFIED = "verified", "Verified"
+        REJECTED = "rejected", "Rejected"
 
     property = models.OneToOneField(
         Property,
@@ -214,12 +220,16 @@ class PropertyVerification(models.Model):
 
     verified_by = models.ForeignKey(
         User,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="verified_properties"
     )
 
     status = models.CharField(
-        max_length=50
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING
     )
 
     remarks = models.TextField(
@@ -234,7 +244,6 @@ class PropertyVerification(models.Model):
 
     def __str__(self):
         return f"{self.property.id} - {self.status}"
-
         
 class Favorite(models.Model):
 
