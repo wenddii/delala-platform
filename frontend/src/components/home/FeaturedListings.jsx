@@ -4,13 +4,21 @@ import {
   Sparkles, ChevronLeft, ChevronRight, ArrowRight,
   MapPin, Bed, Bath, Ruler, Heart, Check,
 } from 'lucide-react'
-import { getListings } from '../../services/propertyService.js'
+import { getListings, getPropertyImages } from '../../services/propertyService.js'
 import { formatPrice } from '../../data/properties.js'
 
 // Normalise backend listing shape to what this component needs
-function normalise(l) {
+// Images live on the separate /api/properties/images/ endpoint — the
+// listings response never nests them (confirmed via Django admin) — so
+// `images` (fetched separately) is matched in by property id here.
+function normalise(l, images) {
   const prop = l.property || {}
   const loc  = (typeof prop === 'object' ? prop.location : null) || {}
+  const propId = prop.id ?? l.property
+  const myImages = (images || []).filter(img =>
+    String(img.property) === String(propId) || String(img.property?.id) === String(propId)
+  )
+  const primaryImg = myImages.find(img => img.is_primary) || myImages[0]
   return {
     ...l,
     listing:   l.listing_type || '',
@@ -19,7 +27,7 @@ function normalise(l) {
     beds:      prop.bedrooms  ?? 0,
     baths:     prop.bathrooms ?? 0,
     area:      prop.area_sqm  ?? 0,
-    img:       l.primary_image?.image_url || '',
+    img:       primaryImg?.image_url || '',
     agent:     l.owner_name  || '',
     verified:  l.is_verified ?? false,
     furnished: l.is_furnished ?? false,
@@ -36,8 +44,12 @@ export default function FeaturedListings() {
 
   useEffect(() => {
     let cancelled = false
-    getListings()
-      .then(data => { if (!cancelled) setListings(Array.isArray(data) ? data.map(normalise) : []) })
+    Promise.all([getListings(), getPropertyImages()])
+      .then(([lData, iData]) => {
+        if (cancelled) return
+        const images = Array.isArray(iData) ? iData : []
+        setListings(Array.isArray(lData) ? lData.map(l => normalise(l, images)) : [])
+      })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }

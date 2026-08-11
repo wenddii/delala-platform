@@ -3,15 +3,23 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { MapPin, Bed, Bath, Ruler, Phone, MessageCircle } from 'lucide-react'
 import Navbar from '../components/Navbar.jsx'
 import Footer from '../components/Footer.jsx'
-import { getListing } from '../services/propertyService.js'
+import { getListing, getPropertyImages } from '../services/propertyService.js'
 import { parseDRFError } from '../services/api.js'
 import { formatPrice } from '../data/properties.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
 // Normalise backend listing shape → UI shape
-function normalise(l) {
+// NOTE: images live on the separate /api/properties/images/ endpoint — the
+// listing/property response never nests them (confirmed via Django admin) —
+// so `images` (fetched separately) must be passed in and matched by property id.
+function normalise(l, images) {
   const prop = l.property || {}
   const loc  = prop.location || {}
+  const propId = prop.id ?? l.property
+  const myImages = (images || []).filter(img =>
+    String(img.property) === String(propId) || String(img.property?.id) === String(propId)
+  )
+  const primaryImg = myImages.find(img => img.is_primary) || myImages[0]
   return {
     ...l,
     listing:   l.listing_type  || l.listing  || '',
@@ -20,7 +28,11 @@ function normalise(l) {
     beds:      prop.bedrooms   ?? l.beds   ?? 0,
     baths:     prop.bathrooms  ?? l.baths  ?? 0,
     area:      prop.area_sqm   ?? l.area   ?? 0,
-    img:       l.primary_image?.image_url || l.img || '',
+    img:       primaryImg?.image_url || l.img || '',
+    // description lives on the nested Property object, not the Listing —
+    // spreading ...l alone never picks it up since Listing has no field
+    // of its own by that name.
+    description: prop.description || l.description || '',
     agent:     l.owner_name    || l.agent  || '',
     verified:  l.is_verified   ?? l.verified ?? false,
     agentPhone:l.owner_phone   || l.agentPhone || '',
@@ -41,7 +53,11 @@ export default function PropertyDetail() {
     setLoading(true)
     setError('')
     getListing(id)
-      .then(data => { if (!cancelled) setProperty(normalise(data)) })
+      .then(data =>
+        getPropertyImages()
+          .then(images => { if (!cancelled) setProperty(normalise(data, images)) })
+          .catch(() => { if (!cancelled) setProperty(normalise(data, [])) })
+      )
       .catch(err  => { if (!cancelled) setError(parseDRFError(err)) })
       .finally(()  => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }

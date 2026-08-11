@@ -15,19 +15,28 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   UserCog, LogOut, Plus, Heart, Bookmark, ShieldCheck,
   Upload, X, CheckCircle, AlertCircle, Pencil, Eye,
-  Clock, XCircle, MessageSquare,
+  Clock, XCircle, MessageSquare, Bed, Bath, Ruler,
 } from 'lucide-react'
 import Navbar from '../components/Navbar.jsx'
 import Footer from '../components/Footer.jsx'
 import PropertyCard from '../components/PropertyCard.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
-  getMyProperties, getListings, getFavorites, getVerifications,
+  getMyProperties, getListings, getFavorites, getVerifications, getPropertyImages,
 } from '../services/propertyService.js'
 import { parseDRFError } from '../services/api.js'
 import { formatPrice } from '../data/properties.js'
 
-// ── Verification status display config ────────────────────────────────────────
+// Generate a display label for a Property (which has no title field).
+// Uses property_type + location to produce a human-readable string.
+function propertyLabel(p) {
+  const type = p.property_type?.name || p.type || p.property_type || ''
+  const loc  = p.loc || p.location?.neighborhood || p.location?.sub_city || ''
+  if (type && loc)  return `${type} in ${loc}`
+  if (type)         return type
+  if (loc)          return `Property in ${loc}`
+  return 'Property'
+}
 // Rule 5: pending | verified | rejected
 const VSTATUS = {
   pending:  { label: 'Pending review',  bg: '#FEF9C3', color: '#854D0E', icon: Clock,       desc: 'Our team is reviewing your property and documents. This usually takes 1–2 business days.' },
@@ -97,8 +106,27 @@ function DocUpload({ label, hint, value, onChange, allowedTypes, icon }) {
   )
 }
 
+// ── Image resolution helper ────────────────────────────────────────────────────
+// The backend may return the primary image in different shapes depending on the
+// serializer depth. Try every known variant before giving up.
+function resolveImg(obj) {
+  if (!obj) return ''
+  // Nested primary_image object
+  if (obj.primary_image?.image_url) return obj.primary_image.image_url
+  if (obj.primary_image?.url)       return obj.primary_image.url
+  // Inline images array
+  if (Array.isArray(obj.images) && obj.images.length > 0) {
+    const primary = obj.images.find(i => i.is_primary) || obj.images[0]
+    return primary?.image_url || primary?.url || ''
+  }
+  // Flat field
+  if (obj.image_url) return obj.image_url
+  if (obj.img)       return obj.img
+  return ''
+}
+
 // ── Normalise helpers ─────────────────────────────────────────────────────────
-function normaliseProperty(p, listings, verifications) {
+function normaliseProperty(p, listings, verifications, images) {
   const loc    = p.location || {}
   const linked = listings.find(l =>
     String(l.property) === String(p.id) || String(l.property?.id) === String(p.id)
@@ -106,8 +134,16 @@ function normaliseProperty(p, listings, verifications) {
   const verif  = verifications.find(v =>
     String(v.property) === String(p.id) || String(v.property?.id) === String(p.id)
   )
+  // Images live entirely on the separate /api/properties/images/ endpoint —
+  // the properties list response never nests them. Match by property id,
+  // prefer the one marked is_primary, else fall back to the first found.
+  const myImages = (images || []).filter(img =>
+    String(img.property) === String(p.id) || String(img.property?.id) === String(p.id)
+  )
+  const primaryImg = myImages.find(img => img.is_primary) || myImages[0]
   return {
     ...p,
+    img:            primaryImg?.image_url || resolveImg(p),
     loc:            loc.neighborhood || loc.sub_city || '',
     type:           p.property_type?.name || p.property_type || '',
     beds:           p.bedrooms  ?? 0,
@@ -117,8 +153,6 @@ function normaliseProperty(p, listings, verifications) {
     listing_type:   linked?.listing_type || 'sale',
     listing_id:     linked?.id           || null,
     listing_status: linked?.status       || null,
-    img:            p.primary_image?.image_url || '',
-    // Verification from backend — Rule 5
     verif_status:   verif?.status   || 'pending',
     verif_remarks:  verif?.remarks  || '',
     verif_id:       verif?.id       || null,
@@ -130,13 +164,13 @@ function normaliseListing(l) {
   const loc  = (typeof prop === 'object' ? prop.location : null) || {}
   return {
     ...l,
+    img:     resolveImg(l) || resolveImg(prop),
     listing: l.listing_type || '',
     type:    prop.property_type?.name || prop.property_type || '',
     loc:     loc.neighborhood || loc.sub_city || '',
     beds:    prop.bedrooms  ?? 0,
     baths:   prop.bathrooms ?? 0,
     area:    prop.area_sqm  ?? 0,
-    img:     l.primary_image?.image_url || '',
     status:  l.status || 'active',
     price:   l.price || 0,
   }
@@ -169,19 +203,20 @@ export default function UserProfile() {
   const [verifyDone,     setVerifyDone]    = useState(!!user?.idVerified)
   const [verifyError,    setVerifyError]   = useState('')
 
-  // Fetch: own properties + all listings + verifications
+  // Fetch: own properties + all listings + verifications + images
   useEffect(() => {
     if (!user) return
     let cancelled = false
     setPropsLoading(true)
-    Promise.all([getMyProperties(), getListings(), getVerifications()])
-      .then(([props, listings, verifs]) => {
+    Promise.all([getMyProperties(), getListings(), getVerifications(), getPropertyImages()])
+      .then(([props, listings, verifs, images]) => {
         if (cancelled) return
         const mine = (Array.isArray(props) ? props : [])
           .filter(p => String(p.owner) === String(user.id))
         const lArr = Array.isArray(listings) ? listings : []
         const vArr = Array.isArray(verifs)   ? verifs   : []
-        setMyProps(mine.map(p => normaliseProperty(p, lArr, vArr)))
+        const iArr = Array.isArray(images)   ? images   : []
+        setMyProps(mine.map(p => normaliseProperty(p, lArr, vArr, iArr)))
         setAllListings(lArr)
       })
       .catch(() => {})
@@ -339,7 +374,7 @@ export default function UserProfile() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2 mb-1">
-                            <p className="text-sm font-bold text-ethio-ink leading-snug">{p.title}</p>
+                            <p className="text-sm font-bold text-ethio-ink leading-snug">{propertyLabel(p)}</p>
                             <div className="flex items-center gap-1.5 shrink-0">
                               {/* Verification badge */}
                               <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, background:vs.bg, color:vs.color, whiteSpace:'nowrap' }}>
@@ -353,8 +388,18 @@ export default function UserProfile() {
                               )}
                             </div>
                           </div>
+                          <div style={{ display:'flex', alignItems:'center', gap:12, fontSize:12, color:'#6B7280', marginTop:2 }}>
+                            <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><Bed size={13}/> {p.beds}</span>
+                            <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><Bath size={13}/> {p.baths}</span>
+                            <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><Ruler size={13}/> {p.area} m²</span>
+                          </div>
                           {p.price > 0 && (
                             <p className="text-sm font-bold text-ethio-primary">{formatPrice(Number(p.price), p.listing_type)}</p>
+                          )}
+                          {p.description && (
+                            <p style={{ fontSize: 12, color: '#4B5563', marginTop: 4, lineHeight: 1.5 }}>
+                              {p.description.length > 140 ? `${p.description.slice(0, 140)}…` : p.description}
+                            </p>
                           )}
                           {/* Verification guidance */}
                           <p style={{ fontSize: 11, color: '#6B7280', marginTop: 4, lineHeight: 1.5 }}>{vs.desc}</p>

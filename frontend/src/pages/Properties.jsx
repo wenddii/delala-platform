@@ -4,7 +4,7 @@ import { CheckCircle, X } from 'lucide-react'
 import Navbar from '../components/Navbar.jsx'
 import Footer from '../components/Footer.jsx'
 import PropertyCard from '../components/PropertyCard.jsx'
-import { getListings } from '../services/propertyService.js'
+import { getListings, getPropertyImages } from '../services/propertyService.js'
 import { parseDRFError } from '../services/api.js'
 
 export default function Properties() {
@@ -12,6 +12,7 @@ export default function Properties() {
   const [activeTab,  setActiveTab]  = useState('sale')
   const [showBanner, setShowBanner] = useState(false)
   const [listings,   setListings]   = useState([])
+  const [images,     setImages]     = useState([])
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState('')
   const location = useLocation()
@@ -31,13 +32,17 @@ export default function Properties() {
     if (searchParams.get('listing') === 'rent') setActiveTab('rent')
   }, [searchParams])
 
-  // Fetch all listings once; filter client-side (no server-side filter params)
+  // Fetch all listings + images once; filter client-side (no server-side filter params)
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError('')
-    getListings()
-      .then(data => { if (!cancelled) setListings(Array.isArray(data) ? data : []) })
+    Promise.all([getListings(), getPropertyImages()])
+      .then(([lData, iData]) => {
+        if (cancelled) return
+        setListings(Array.isArray(lData) ? lData : [])
+        setImages(Array.isArray(iData) ? iData : [])
+      })
       .catch(err  => { if (!cancelled) setError(parseDRFError(err)) })
       .finally(()  => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -45,14 +50,23 @@ export default function Properties() {
 
   // Rule 11: public browse must ONLY show active listings.
   // 'active' is the only valid published status per the business rules.
-  const normalise = (l) => ({
-    ...l,
-    listing: l.listing_type || l.listing || '',
-    type:    l.property?.property_type?.name || l.property?.property_type || l.type || '',
-    loc:     l.property?.location?.neighborhood || l.property?.location?.sub_city || l.loc || '',
-    img:     l.primary_image?.image_url || l.img || '',
-    status:  l.status || '',
-  })
+  // Images live on the separate /api/properties/images/ endpoint — the
+  // listings response never nests them (confirmed via Django admin).
+  const normalise = (l) => {
+    const propId = l.property?.id ?? l.property
+    const myImages = images.filter(img =>
+      String(img.property) === String(propId) || String(img.property?.id) === String(propId)
+    )
+    const primaryImg = myImages.find(img => img.is_primary) || myImages[0]
+    return {
+      ...l,
+      listing: l.listing_type || l.listing || '',
+      type:    l.property?.property_type?.name || l.property?.property_type || l.type || '',
+      loc:     l.property?.location?.neighborhood || l.property?.location?.sub_city || l.loc || '',
+      img:     primaryImg?.image_url || l.img || '',
+      status:  l.status || '',
+    }
+  }
 
   const filtered = listings.map(normalise).filter(p => {
     if (p.status !== 'active') return false   // strict — pending/rejected/inactive never shown

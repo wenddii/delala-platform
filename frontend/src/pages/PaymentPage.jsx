@@ -21,6 +21,16 @@ import { parseDRFError } from '../services/api.js'
 
 const uid = () => crypto.randomUUID()
 
+// Build a listing title from property type + location (property has no title field)
+function listingTitle(p) {
+  const type = p.property_type?.name || p.type || ''
+  const loc  = p.loc || p.location?.neighborhood || p.location?.sub_city || ''
+  if (type && loc)  return `${type} in ${loc}`
+  if (type)         return type
+  if (loc)          return `Property in ${loc}`
+  return 'Property listing'
+}
+
 const PLANS = [
   { id: 'free',    label: 'Free',          rate: 0,    icon: <CheckCircle size={22} />, color: '#6B7280', bg: '#F9FAFB', border: '#D1D5DB',
     desc: 'List at no cost. Standard visibility.' },
@@ -76,7 +86,7 @@ export default function PaymentPage() {
     for (const p of selectedProps) {
       const ld = listingData[p.id] || {}
       if (!ld.price || !String(ld.price).replace(/\D/g, '')) {
-        setError(`Enter a price for "${p.title}".`); return
+        setError(`Enter a price for "${listingTitle(p)}".`); return
       }
     }
     if (plan !== 'free' && !method) { setError('Choose a payment method.'); return }
@@ -94,7 +104,7 @@ export default function PaymentPage() {
           return createListing({
             id:           uid(),
             property:     p.id,
-            title:        p.title || 'Property listing',
+            title:        listingTitle(p),
             listing_type: ld.listing_type || 'sale',
             price:        String(price),
             currency:     'ETB',
@@ -151,7 +161,7 @@ export default function PaymentPage() {
               const ld = listingData[p.id] || {}
               return (
                 <div key={p.id} className="p-4 border border-ethio-border rounded-2xl bg-ethio-tint/30">
-                  <p className="text-sm font-bold text-ethio-ink mb-3 truncate">{p.title}</p>
+                  <p className="text-sm font-bold text-ethio-ink mb-3 truncate">{listingTitle(p)}</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div>
                       <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>
@@ -210,7 +220,7 @@ export default function PaymentPage() {
             <div className="divide-y divide-ethio-border">
               {feeRows.map((r, i) => (
                 <div key={r.id || i} className="flex items-center justify-between px-5 py-3 text-sm">
-                  <span className="text-ethio-muted truncate max-w-[200px]">{r.title || `Property ${i + 1}`}</span>
+                  <span className="text-ethio-muted truncate max-w-[200px]">{listingTitle(r) || `Property ${i + 1}`}</span>
                   <span className="font-semibold text-ethio-ink shrink-0 ml-4">ETB {r.fee.toLocaleString()}</span>
                 </div>
               ))}

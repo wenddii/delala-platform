@@ -28,7 +28,7 @@ import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   createProperty, updateProperty, getProperty,
-  addPropertyImage, addPropertyDocument,
+  addPropertyImage,
   getPropertyTypes, getLocations,
 } from '../services/propertyService.js'
 import { parseDRFError } from '../services/api.js'
@@ -193,7 +193,7 @@ function DocUploader({ files, onChange }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 const EMPTY = {
-  title: '', propertyType: '', bedrooms: '', bathrooms: '',
+  propertyType: '', bedrooms: '', bathrooms: '',
   size: '', description: '', locationId: '',
 }
 
@@ -224,7 +224,6 @@ export default function AddProperty() {
     if (!editId) return
     getProperty(editId).then(p => {
       setForm({
-        title:        p.title        || '',
         propertyType: String(p.property_type?.id || p.property_type || ''),
         bedrooms:     String(p.bedrooms  || ''),
         bathrooms:    String(p.bathrooms || ''),
@@ -249,7 +248,6 @@ export default function AddProperty() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     // ── Validation ────────────────────────────────────────────────────────────
-    if (!form.title.trim())    { setError('Property title is required.'); return }
     if (!form.propertyType)    { setError('Property type is required.');  return }
     if (!form.locationId)      { setError('Please select a location.');   return }
     if (!isEdit && photos.length === 0) { setError('At least one property photo is required.'); return }
@@ -281,9 +279,14 @@ export default function AddProperty() {
       fd.append('bathrooms',     Number(form.bathrooms) || 0)
       fd.append('area_sqm',      Number(form.size)      || 0)
       fd.append('description',   form.description || '')
-      // Attach the first document file directly — backend FileField named 'document'
-      fd.append('document_type', 'ownership')
-      fd.append('document',      docs[0])
+      // Only attach a document if the user actually selected one. On edit,
+      // docs[] starts empty (existing docs aren't re-fetched into this
+      // uploader) — appending an empty/undefined value here would corrupt
+      // the request, so only send it when a real file was chosen.
+      if (docs.length > 0) {
+        fd.append('document_type', 'ownership')
+        fd.append('document', docs[0])
+      }
       // If there are additional documents, we'll attach them after via addPropertyDocument
       // (using the same pattern — first is required, extras are supplementary)
 
@@ -306,22 +309,12 @@ export default function AddProperty() {
         )
       }
 
-      // ── Step 4: attach any extra documents (docs[1..n]) ──────────────────
-      // docs[0] was already submitted with the property. Extras go here.
-      if (docs.length > 1 && savedProperty?.id) {
-        setUploadStep('Attaching extra documents…')
-        // Upload extras to ImgBB then attach
-        const extraUrls = await uploadManyToImgBB(docs.slice(1), (done, total) =>
-          setUploadStep(`Uploading extra documents… (${done} / ${total})`)
-        )
-        await Promise.allSettled(
-          extraUrls.map(url => addPropertyDocument({
-            property:      savedProperty.id,
-            document_type: 'ownership',
-            document_url:  url,
-          }))
-        )
-      }
+      // ── Step 4: extra documents are already handled by the atomic POST ────
+      // docs[0] was sent with the property creation via FormData.
+      // Additional docs (docs[1..n]) — skip for now; the backend's atomic
+      // endpoint only accepts one document per property creation request.
+      // TODO: attach extras via a separate multipart POST to /api/properties/documents/
+      //       once the endpoint's exact multipart field names are confirmed.
 
       // Rule 14: redirect to profile — property is now pending verification
       navigate('/profile', { state: { newProperty: true } })
@@ -374,11 +367,6 @@ export default function AddProperty() {
 
         <form onSubmit={handleSubmit} noValidate>
           <SectionHead title="Property details" />
-
-          <Field label="Property title" required>
-            <input value={form.title} onChange={upd('title')} placeholder="e.g. 3BR Apartment in Bole"
-              style={inp} onFocus={onF} onBlur={onB} />
-          </Field>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <Field label="Property type" required>

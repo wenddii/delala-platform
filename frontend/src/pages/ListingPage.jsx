@@ -16,18 +16,26 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Pencil, Clock, XCircle, CheckCircle, Lock } from 'lucide-react'
 import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
-import { getMyProperties, getListings, getVerifications } from '../services/propertyService.js'
+import { getMyProperties, getListings, getVerifications, getPropertyImages } from '../services/propertyService.js'
 import { parseDRFError } from '../services/api.js'
 import { formatPrice } from '../data/properties.js'
 
-// Verification status config for display
+// Generate a display label for a Property (no title field on the backend model)
+function propertyLabel(p) {
+  const type = p.property_type?.name || p.type || ''
+  const loc  = p.loc || p.location?.neighborhood || p.location?.sub_city || ''
+  if (type && loc)  return `${type} in ${loc}`
+  if (type)         return type
+  if (loc)          return `Property in ${loc}`
+  return 'Property'
+}
 const VS = {
   pending:  { label: 'Pending review', bg: '#FEF9C3', color: '#854D0E', icon: Clock       },
   verified: { label: 'Verified',       bg: '#DCFCE7', color: '#166534', icon: CheckCircle  },
   rejected: { label: 'Rejected',       bg: '#FEE2E2', color: '#991B1B', icon: XCircle      },
 }
 
-function normalise(p, listings, verifs) {
+function normalise(p, listings, verifs, images) {
   const loc    = p.location || {}
   const linked = listings.find(l =>
     String(l.property) === String(p.id) || String(l.property?.id) === String(p.id)
@@ -35,6 +43,12 @@ function normalise(p, listings, verifs) {
   const verif = verifs.find(v =>
     String(v.property) === String(p.id) || String(v.property?.id) === String(p.id)
   )
+  // Images live on the separate /api/properties/images/ endpoint — the
+  // properties list response never nests them (confirmed via Django admin).
+  const myImages = (images || []).filter(img =>
+    String(img.property) === String(p.id) || String(img.property?.id) === String(p.id)
+  )
+  const primaryImg = myImages.find(img => img.is_primary) || myImages[0]
   return {
     ...p,
     loc:           loc.neighborhood || loc.sub_city || '',
@@ -42,7 +56,7 @@ function normalise(p, listings, verifs) {
     beds:          p.bedrooms  ?? 0,
     baths:         p.bathrooms ?? 0,
     area:          p.area_sqm  ?? 0,
-    img:           p.primary_image?.image_url || '',
+    img:           primaryImg?.image_url || '',
     // Listing data
     listing_id:     linked?.id           || null,
     listing_status: linked?.status       || null,
@@ -70,14 +84,15 @@ export default function ListingPage() {
     let cancelled = false
     setLoading(true)
     setError('')
-    Promise.all([getMyProperties(), getListings(), getVerifications()])
-      .then(([props, listings, verifs]) => {
+    Promise.all([getMyProperties(), getListings(), getVerifications(), getPropertyImages()])
+      .then(([props, listings, verifs, images]) => {
         if (cancelled) return
         const mine = (Array.isArray(props) ? props : [])
           .filter(p => String(p.owner) === String(user.id))
         const lArr = Array.isArray(listings) ? listings : []
         const vArr = Array.isArray(verifs)   ? verifs   : []
-        setProperties(mine.map(p => normalise(p, lArr, vArr)))
+        const iArr = Array.isArray(images)   ? images   : []
+        setProperties(mine.map(p => normalise(p, lArr, vArr, iArr)))
       })
       .catch(err => { if (!cancelled) setError(parseDRFError(err)) })
       .finally(()  => { if (!cancelled) setLoading(false) })
@@ -173,7 +188,7 @@ export default function ListingPage() {
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-ethio-ink truncate">{p.title}</p>
+                          <p className="text-sm font-bold text-ethio-ink truncate">{propertyLabel(p)}</p>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <span style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'2px 8px', borderRadius:20, fontSize:10, fontWeight:700, background:vs.bg, color:vs.color }}>
                               <VIcon size={10} /> {vs.label}

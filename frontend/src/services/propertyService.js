@@ -17,14 +17,18 @@ import api from './api.js'
 // ── Property Types ────────────────────────────────────────────────────────────
 // GET /api/properties/property-types/   AllowAny
 // Returns: [{ id, name }]
+// Uses plain fetch (no auth header) so a stale/missing token never blocks it.
 export const getPropertyTypes = () =>
-  api.get('/api/properties/property-types/').then(r => r.data)
+  fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/properties/property-types/`)
+    .then(r => r.json())
 
 // ── Locations ────────────────────────────────────────────────────────────────
 // GET /api/properties/locations/   AllowAny
 // Returns: [{ id, city, sub_city, woreda, neighborhood, latitude, longitude }]
+// Uses plain fetch (no auth header) so a stale/missing token never blocks it.
 export const getLocations = () =>
-  api.get('/api/properties/locations/').then(r => r.data)
+  fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/properties/locations/`)
+    .then(r => r.json())
 
 // ── Properties (auth required) ───────────────────────────────────────────────
 // POST /api/properties/properties/   IsAuthenticated
@@ -34,8 +38,13 @@ export const getLocations = () =>
 //         description, document_type (str), document (File)
 // Rule 4: owner is set server-side — NEVER include owner in the request.
 export const createProperty = (formData) =>
+  // NOTE: do NOT set Content-Type here. Multipart requests need a boundary
+  // (e.g. multipart/form-data; boundary=----abc123) that only the browser
+  // can generate correctly. Setting the header manually without one causes
+  // Django to reject the request. Passing FormData with no Content-Type
+  // override lets the browser set it (and the boundary) automatically.
   api.post('/api/properties/properties/', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: { 'Content-Type': undefined },
   }).then(r => r.data)
 
 // PATCH /api/properties/properties/<pk>/   IsAuthenticated
@@ -43,7 +52,7 @@ export const createProperty = (formData) =>
 export const updateProperty = (pk, body) => {
   const isFormData = body instanceof FormData
   return api.patch(`/api/properties/properties/${pk}/`, body, {
-    headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    headers: isFormData ? { 'Content-Type': undefined } : {},
   }).then(r => r.data)
 }
 
@@ -92,6 +101,16 @@ export const removeFavorite = (pk) =>
 // ⚠️  image_url is a URLField — no binary upload supported
 export const addPropertyImage = (body) =>
   api.post('/api/properties/images/', body).then(r => r.data)
+
+// GET /api/properties/images/   IsAuthenticated
+// Returns: [{ id, property, image_url, is_primary, created_at }, ...] for ALL
+// images across all properties — no ?property= filter confirmed, so the
+// caller must filter/match by property id client-side (same pattern as
+// getVerifications()). The "Property List" response does NOT nest images —
+// confirmed via Django admin showing PropertyImage as a fully separate model
+// — so this call is required to ever display photos anywhere in the app.
+export const getPropertyImages = () =>
+  api.get('/api/properties/images/').then(r => r.data)
 
 // ── Property Documents ────────────────────────────────────────────────────────
 // POST /api/properties/documents/   IsAuthenticated
