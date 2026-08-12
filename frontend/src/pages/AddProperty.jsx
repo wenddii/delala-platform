@@ -250,6 +250,7 @@ export default function AddProperty() {
     // ── Validation ────────────────────────────────────────────────────────────
     if (!form.propertyType)    { setError('Property type is required.');  return }
     if (!form.locationId)      { setError('Please select a location.');   return }
+    if (!form.description.trim()) { setError('Description is required.'); return }
     if (!isEdit && photos.length === 0) { setError('At least one property photo is required.'); return }
     if (!isEdit && docs.length === 0)   { setError('An ownership document is required.'); return }
 
@@ -429,8 +430,8 @@ export default function AddProperty() {
           </div>
 
           {/* Description — optional per rules */}
-          <SectionHead title="Description" subtitle="Optional" />
-          <Field label="Property description">
+          <SectionHead title="Description" subtitle="Required" />
+          <Field label="Property description" required>
             <textarea value={form.description} onChange={upd('description')} rows={3}
               placeholder="Describe the property — features, condition, nearby landmarks… (optional)"
               style={{ ...inp, resize: 'vertical', minHeight: 80 }} onFocus={onF} onBlur={onB} />
