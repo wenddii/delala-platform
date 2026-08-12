@@ -75,6 +75,18 @@ class Location(models.Model):
 
 class Property(models.Model):
 
+    class ListingStatus(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        PENDING_VERIFICATION = "pending_verification", "Pending Verification"
+        VERIFIED = "verified", "Verified"
+        REJECTED = "rejected", "Rejected"
+        PENDING_PAYMENT = "pending_payment", "Pending Payment"
+        PENDING_PAYMENT_VERIFICATION = (
+            "pending_payment_verification",
+            "Pending Payment Verification"
+        )
+        LISTED = "listed", "Listed"
+
     owner = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -101,6 +113,12 @@ class Property(models.Model):
 
     description = models.TextField()
 
+    listing_status = models.CharField(
+        max_length=40,
+        choices=ListingStatus.choices,
+        default=ListingStatus.DRAFT
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True
     )
@@ -111,8 +129,6 @@ class Property(models.Model):
 
     def __str__(self):
         return self.description[:50]
-
-
 # ============================================================
 # PROPERTY DOCUMENT
 # ============================================================

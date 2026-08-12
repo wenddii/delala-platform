@@ -1,5 +1,8 @@
 from django.contrib import admin
-from django.utils.html import format_html
+from django.contrib import admin
+from django.utils.html import format_html, mark_safe
+from .models import PropertyVerification
+
 
 from .models import (
     PropertyType,
@@ -259,6 +262,8 @@ class PropertyDocumentAdmin(admin.ModelAdmin):
 # PROPERTY VERIFICATION
 # ============================================================
 
+
+
 @admin.register(PropertyVerification)
 class PropertyVerificationAdmin(admin.ModelAdmin):
 
@@ -272,6 +277,7 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
 
     list_filter = (
         "status",
+        "verified_at",
     )
 
     search_fields = (
@@ -313,16 +319,16 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
         ),
     )
 
-    @admin.display(
-        description="Owner"
-    )
-    def get_owner(self, obj):
+    # Verification records are created automatically
+    # when a property is created.
+    def has_add_permission(self, request):
+        return False
 
+    @admin.display(description="Owner")
+    def get_owner(self, obj):
         return obj.property.owner.full_name
 
-    @admin.display(
-        description="Property Documents"
-    )
+    @admin.display(description="Property Documents")
     def property_documents(self, obj):
 
         if not obj or not obj.pk:
@@ -330,18 +336,24 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
 
         documents = obj.property.documents.all()
 
-        if not documents:
+        if not documents.exists():
             return "No documents uploaded."
 
         document_html = []
 
         for document in documents:
 
+            # Document record exists but no file was uploaded
             if not document.document:
                 document_html.append(
                     format_html(
                         """
-                        <div style="margin-bottom: 20px;">
+                        <div style="
+                            margin-bottom: 20px;
+                            padding: 15px;
+                            border: 1px solid #ddd;
+                            border-radius: 8px;
+                        ">
                             <strong>{}</strong>
                             <br>
                             <span>No document file uploaded.</span>
@@ -352,26 +364,30 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
                 )
                 continue
 
+            document_url = document.document.url
+
             document_html.append(
                 format_html(
                     """
-                    <div
-                        style="
-                            margin-bottom: 25px;
-                            padding: 15px;
-                            border: 1px solid #ddd;
-                            border-radius: 8px;
-                        "
-                    >
+                    <div style="
+                        margin-bottom: 25px;
+                        padding: 15px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                    ">
+
                         <strong>{}</strong>
 
                         <br><br>
 
                         <img
                             src="{}"
+                            alt="{}"
                             style="
                                 max-width: 600px;
                                 max-height: 700px;
+                                width: auto;
+                                height: auto;
                                 object-fit: contain;
                                 border: 1px solid #ddd;
                                 border-radius: 6px;
@@ -383,25 +399,46 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
                         <a
                             href="{}"
                             target="_blank"
+                            rel="noopener noreferrer"
                         >
                             Open Full Size
                         </a>
+
                     </div>
                     """,
                     document.document_type,
-                    document.document.url,
-                    document.document.url,
+                    document_url,
+                    document.document_type,
+                    document_url,
                 )
             )
 
-        return format_html(
+        # Django 6 requires format_html() to receive
+        # arguments. The individual HTML blocks above
+        # have already been safely formatted.
+        return mark_safe(
             "".join(document_html)
         )
 
+    def save_model(self, request, obj, form, change):
 
-# ============================================================
-# FAVORITE
-# ============================================================
+        # Automatically record which admin reviewed
+        # the property.
+        if (
+            obj.status in [
+                PropertyVerification.Status.VERIFIED,
+                PropertyVerification.Status.REJECTED,
+            ]
+            and not obj.verified_by
+        ):
+            obj.verified_by = request.user
+
+        super().save_model(
+            request,
+            obj,
+            form,
+            change,
+        )
 
 @admin.register(Favorite)
 class FavoriteAdmin(admin.ModelAdmin):

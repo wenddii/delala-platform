@@ -24,7 +24,10 @@ from .serializers import (
 )
 
 
-# Property Types
+# ============================================================
+# PROPERTY TYPES
+# ============================================================
+
 class PropertyTypeListView(generics.ListCreateAPIView):
     queryset = PropertyType.objects.all()
     serializer_class = PropertyTypeSerializer
@@ -37,7 +40,10 @@ class PropertyTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [AllowAny]
 
 
-# Locations
+# ============================================================
+# LOCATIONS
+# ============================================================
+
 class LocationListView(generics.ListCreateAPIView):
     queryset = Location.objects.all()
     serializer_class = LocationSerializer
@@ -50,80 +56,175 @@ class LocationDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [AllowAny]
 
 
-# Properties
+# ============================================================
+# PROPERTIES
+# ============================================================
+
 class PropertyListView(generics.ListCreateAPIView):
-    queryset = Property.objects.all()
+
     serializer_class = PropertySerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Property.objects.select_related(
+            "owner",
+            "property_type",
+            "location",
+            "verification",
+        ).prefetch_related(
+            "documents",
+            "images",
+        ).all()
 
 
 class PropertyDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Property.objects.all()
+
     serializer_class = PropertySerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        return Property.objects.select_related(
+            "owner",
+            "property_type",
+            "location",
+            "verification",
+        ).prefetch_related(
+            "documents",
+            "images",
+        ).filter(
+            owner=self.request.user
+        )
 
-# Property Listings
+
+# ============================================================
+# PROPERTY LISTINGS
+# ============================================================
+
 class PropertyListingListView(generics.ListCreateAPIView):
-    queryset = PropertyListing.objects.all()
+
     serializer_class = PropertyListingSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return PropertyListing.objects.select_related(
+            "property",
+            "property__owner",
+            "property__property_type",
+            "property__location",
+            "property__verification",
+        ).all()
 
 
 class PropertyListingDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = PropertyListing.objects.all()
+
     serializer_class = PropertyListingSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        return PropertyListing.objects.filter(
+            property__owner=self.request.user
+        )
 
-# Property Images
+
+# ============================================================
+# PROPERTY IMAGES
+# ============================================================
+
 class PropertyImageListView(generics.ListCreateAPIView):
-    queryset = PropertyImage.objects.all()
+
     serializer_class = PropertyImageSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return PropertyImage.objects.filter(
+            property__owner=self.request.user
+        )
 
 
 class PropertyImageDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = PropertyImage.objects.all()
+
     serializer_class = PropertyImageSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        return PropertyImage.objects.filter(
+            property__owner=self.request.user
+        )
 
-# Property Documents
+
+# ============================================================
+# PROPERTY DOCUMENTS
+# ============================================================
+
 class PropertyDocumentListView(generics.ListCreateAPIView):
-    queryset = PropertyDocument.objects.all()
+
     serializer_class = PropertyDocumentSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return PropertyDocument.objects.filter(
+            property__owner=self.request.user
+        )
 
 
 class PropertyDocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = PropertyDocument.objects.all()
+
     serializer_class = PropertyDocumentSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        return PropertyDocument.objects.filter(
+            property__owner=self.request.user
+        )
 
-# Property Verification
+
+# ============================================================
+# PROPERTY VERIFICATION
+# ============================================================
+
 class PropertyVerificationListView(generics.ListCreateAPIView):
-    queryset = PropertyVerification.objects.all()
+
     serializer_class = PropertyVerificationSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return PropertyVerification.objects.filter(
+            property__owner=self.request.user
+        )
 
 
 class PropertyVerificationDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = PropertyVerification.objects.all()
+
     serializer_class = PropertyVerificationSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        return PropertyVerification.objects.filter(
+            property__owner=self.request.user
+        )
 
-# Favorites
+
+# ============================================================
+# FAVORITES
+# ============================================================
+
 class FavoriteListView(generics.ListCreateAPIView):
-    queryset = Favorite.objects.all()
+
     serializer_class = FavoriteSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Favorite.objects.filter(
+            user=self.request.user
+        )
 
 
 class FavoriteDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Favorite.objects.all()
+
     serializer_class = FavoriteSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        return Favorite.objects.filter(
+            user=self.request.user
+        )

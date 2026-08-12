@@ -6,10 +6,19 @@ from apps.properties.models import Property
 
 class RegisterSerializer(serializers.ModelSerializer):
 
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(
+        write_only=True
+    )
+
+    email = serializers.EmailField(
+        required=False,
+        allow_blank=True,
+        allow_null=True
+    )
 
     class Meta:
         model = User
+
         fields = [
             "phone_number",
             "full_name",
@@ -19,15 +28,20 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
 
+        email = validated_data.get("email")
+
+        # Convert empty string to None
+        if email == "":
+            email = None
+
         user = User.objects.create_user(
             phone_number=validated_data["phone_number"],
             full_name=validated_data["full_name"],
-            email=validated_data.get("email"),
+            email=email,
             password=validated_data["password"],
         )
 
         return user
-
 
 class ProfilePropertySerializer(serializers.ModelSerializer):
 

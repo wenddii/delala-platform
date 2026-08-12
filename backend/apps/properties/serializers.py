@@ -86,12 +86,22 @@ class PropertyVerificationSerializer(serializers.ModelSerializer):
 # ============================================================
 # PROPERTY
 # ============================================================
+from django.db import transaction
+from rest_framework import serializers
+
+from .models import (
+    Property,
+    PropertyDocument,
+    PropertyVerification,
+)
+
 
 class PropertySerializer(serializers.ModelSerializer):
 
-    # The document is required when creating a property.
+    # Document uploaded when creating the property
     document_type = serializers.CharField(
-        write_only=True
+        write_only=True,
+        required=True
     )
 
     document = serializers.ImageField(
@@ -99,8 +109,14 @@ class PropertySerializer(serializers.ModelSerializer):
         required=True
     )
 
+    # Document verification status
     verification_status = serializers.CharField(
         source="verification.status",
+        read_only=True
+    )
+
+    # Property workflow status
+    listing_status = serializers.CharField(
         read_only=True
     )
 
@@ -116,6 +132,10 @@ class PropertySerializer(serializers.ModelSerializer):
             "bathrooms",
             "area_sqm",
             "description",
+
+            # Property workflow
+            "listing_status",
+
             "created_at",
             "updated_at",
 
@@ -123,13 +143,14 @@ class PropertySerializer(serializers.ModelSerializer):
             "document_type",
             "document",
 
-            # Verification status shown to frontend
+            # Verification information
             "verification_status",
         )
 
         read_only_fields = (
             "id",
             "owner",
+            "listing_status",
             "created_at",
             "updated_at",
             "verification_status",
@@ -143,6 +164,7 @@ class PropertySerializer(serializers.ModelSerializer):
 
         property = Property.objects.create(
             owner=self.context["request"].user,
+            listing_status=Property.ListingStatus.PENDING_VERIFICATION,
             **validated_data
         )
 
@@ -158,7 +180,6 @@ class PropertySerializer(serializers.ModelSerializer):
         )
 
         return property
-
 
 # ============================================================
 # PROPERTY LISTING
