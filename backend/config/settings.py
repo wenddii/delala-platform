@@ -26,7 +26,7 @@ DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
-    "delala-platform.vercel.app",
+    "delala-platform-4f1e.vercel.app",
 ]
 
 
