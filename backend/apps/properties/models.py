@@ -1,7 +1,6 @@
 from django.db import models
 from apps.accounts.models import User
-
-
+from django.utils.html import format_html, mark_safe
 # ============================================================
 # PROPERTY TYPE
 # ============================================================
