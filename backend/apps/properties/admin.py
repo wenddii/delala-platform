@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.contrib import admin
 from django.utils.html import format_html, mark_safe
 from .models import PropertyVerification
 
@@ -13,6 +12,7 @@ from .models import (
     PropertyDocument,
     PropertyVerification,
     Favorite,
+    Payment,
 )
 
 
@@ -468,3 +468,80 @@ class FavoriteAdmin(admin.ModelAdmin):
     readonly_fields = (
         "created_at",
     )
+
+
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "listing",
+        "user",
+        "amount",
+        "payment_provider",
+        "payment_method",
+        "status",
+        "verified_by",
+        "paid_at",
+    )
+
+    list_filter = (
+        "status",
+        "payment_provider",
+        "payment_method",
+        "paid_at",
+    )
+
+    search_fields = (
+        "listing__title",
+        "user__full_name",
+        "user__phone_number",
+        "transaction_reference",
+    )
+
+    readonly_fields = (
+        "payment_screenshot_preview",
+        "created_at",
+        "updated_at",
+    )
+
+    fieldsets = (
+        ("Payment Information", {
+            "fields": (
+                "listing",
+                "user",
+                "amount",
+                "payment_provider",
+                "payment_method",
+                "transaction_reference",
+                "screenshot",
+                "payment_screenshot_preview",
+            )
+        }),
+        ("Verification", {
+            "fields": (
+                "status",
+                "verified_by",
+                "verified_at",
+                "rejection_reason",
+                "paid_at",
+            )
+        }),
+        ("Dates", {
+            "fields": (
+                "created_at",
+                "updated_at",
+            )
+        }),
+    )
+
+    def payment_screenshot_preview(self, obj):
+        if obj.screenshot:
+            return format_html(
+                '<img src="{}" width="400" />',
+                obj.screenshot.url,
+            )
+        return "No screenshot uploaded"
+
+    payment_screenshot_preview.short_description = "Screenshot Preview"

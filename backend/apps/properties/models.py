@@ -74,17 +74,16 @@ class Location(models.Model):
 
 class Property(models.Model):
 
-    class ListingStatus(models.TextChoices):
+    class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
-        PENDING_VERIFICATION = "pending_verification", "Pending Verification"
-        VERIFIED = "verified", "Verified"
-        REJECTED = "rejected", "Rejected"
         PENDING_PAYMENT = "pending_payment", "Pending Payment"
         PENDING_PAYMENT_VERIFICATION = (
             "pending_payment_verification",
             "Pending Payment Verification"
         )
-        LISTED = "listed", "Listed"
+        PUBLISHED = "published", "Published"
+        UNPUBLISHED = "unpublished", "Unpublished"
+        REJECTED = "rejected", "Rejected"
 
     owner = models.ForeignKey(
         User,
@@ -111,12 +110,6 @@ class Property(models.Model):
     area_sqm = models.FloatField()
 
     description = models.TextField()
-
-    listing_status = models.CharField(
-        max_length=40,
-        choices=ListingStatus.choices,
-        default=ListingStatus.DRAFT
-    )
 
     created_at = models.DateTimeField(
         auto_now_add=True
@@ -321,3 +314,83 @@ class Favorite(models.Model):
             f"{self.user.phone_number} - "
             f"{self.property_listing.title}"
         )
+
+
+class Payment(models.Model):
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    listing = models.OneToOneField(
+        PropertyListing,
+        on_delete=models.CASCADE,
+        related_name="payment"
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="payments"
+    )
+
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    payment_provider = models.CharField(
+        max_length=50
+    )   # Telebirr, CBE, Awash...
+
+    payment_method = models.CharField(
+        max_length=50
+    )   # Mobile Money, Bank Transfer
+
+    screenshot = models.ImageField(
+        upload_to="payment_screenshots/"
+    )
+
+    transaction_reference = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING
+    )
+
+    verified_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_payments"
+    )
+
+    rejection_reason = models.TextField(
+        blank=True,
+        null=True
+    )
+
+    paid_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    verified_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
