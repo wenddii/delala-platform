@@ -10,6 +10,7 @@ from .models import (
     PropertyDocument,
     PropertyVerification,
     Favorite,
+    Payment
 )
 
 from .serializers import (
@@ -21,6 +22,7 @@ from .serializers import (
     PropertyDocumentSerializer,
     PropertyVerificationSerializer,
     FavoriteSerializer,
+    PaymentSerializer
 )
 
 
@@ -227,4 +229,40 @@ class FavoriteDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return Favorite.objects.filter(
             user=self.request.user
+        )
+# ============================================================
+# PAYMENTS
+# ============================================================
+
+# ============================================================
+# PAYMENTS
+# ============================================================
+
+class PaymentListView(generics.ListCreateAPIView):
+
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Payment.objects.filter(
+            user=self.request.user
+        ).select_related(
+            "listing",
+            "user",
+            "verified_by",
+        )
+
+
+class PaymentDetailView(generics.RetrieveUpdateDestroyAPIView):
+
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Payment.objects.filter(
+            user=self.request.user
+        ).select_related(
+            "listing",
+            "user",
+            "verified_by",
         )

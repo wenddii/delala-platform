@@ -17,6 +17,8 @@ from .views import (
     PropertyVerificationDetailView,
     FavoriteListView,
     FavoriteDetailView,
+    PaymentListView,
+    PaymentDetailView,
 )
 
 urlpatterns = [
@@ -115,4 +117,18 @@ urlpatterns = [
         FavoriteDetailView.as_view(),
         name="favorite-detail",
     ),
+    
+
+    path(
+        "payments/",
+        PaymentListView.as_view(),
+        name="payment-list",
+    ),
+
+    path(
+        "payments/<int:pk>/",
+        PaymentDetailView.as_view(),
+        name="payment-detail",
+    ),
+
 ]

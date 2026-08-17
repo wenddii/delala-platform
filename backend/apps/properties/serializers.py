@@ -11,6 +11,7 @@ from .models import (
     PropertyDocument,
     PropertyVerification,
     Favorite,
+    Payment,
 )
 
 
@@ -255,3 +256,16 @@ class FavoriteSerializer(serializers.ModelSerializer):
             "created_at",
         )
 
+
+class PaymentSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Payment
+        fields = "__all__"
+        read_only_fields = (
+            "status",
+            "verified_by",
+            "verified_at",
+            "created_at",
+            "updated_at",
+        )
