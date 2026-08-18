@@ -1,6 +1,6 @@
 from django.db import transaction
-
 from rest_framework import serializers
+from apps.accounts.models import User
 
 from .models import (
     PropertyType,
@@ -14,7 +14,6 @@ from .models import (
     Payment,
 )
 
-
 # ============================================================
 # PROPERTY TYPE
 # ============================================================
@@ -23,8 +22,7 @@ class PropertyTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyType
-        fields = "__all__"
-
+        fields = "all"
 
 # ============================================================
 # LOCATION
@@ -34,8 +32,7 @@ class LocationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Location
-        fields = "__all__"
-
+        fields = "all"
 
 # ============================================================
 # PROPERTY DOCUMENT
@@ -57,7 +54,6 @@ class PropertyDocumentSerializer(serializers.ModelSerializer):
             "id",
             "uploaded_at",
         )
-
 
 # ============================================================
 # PROPERTY VERIFICATION
@@ -83,19 +79,9 @@ class PropertyVerificationSerializer(serializers.ModelSerializer):
             "verified_at",
         )
 
-
 # ============================================================
 # PROPERTY
 # ============================================================
-from django.db import transaction
-from rest_framework import serializers
-
-from .models import (
-    Property,
-    PropertyDocument,
-    PropertyVerification,
-)
-
 
 class PropertySerializer(serializers.ModelSerializer):
 
@@ -110,17 +96,15 @@ class PropertySerializer(serializers.ModelSerializer):
         required=True
     )
 
-    # Document verification status
+    # Verification status — read from the related PropertyVerification row
     verification_status = serializers.CharField(
         source="verification.status",
-        read_only=True
+        read_only=True,
+        default="pending",
     )
-
-   
 
     class Meta:
         model = Property
-
         fields = (
             "id",
             "owner",
@@ -130,15 +114,12 @@ class PropertySerializer(serializers.ModelSerializer):
             "bathrooms",
             "area_sqm",
             "description",
-
             "created_at",
             "updated_at",
-
-            # Document uploaded with the property
+            # write-only — sent on create, not returned
             "document_type",
             "document",
-
-            # Verification information
+            # read-only — resolved from related verification row
             "verification_status",
         )
 
@@ -152,27 +133,66 @@ class PropertySerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-
+        # Pull out the document fields — they don't belong on Property
         document_type = validated_data.pop("document_type")
-        document = validated_data.pop("document")
+        document      = validated_data.pop("document")
 
-        property = Property.objects.create(
+        # Create the property — owner comes from the request, all other
+        # validated fields (property_type, location, bedrooms, etc.) are
+        # spread in via **validated_data
+        property_obj = Property.objects.create(
             owner=self.context["request"].user,
-          
+            **validated_data
         )
 
+        # Attach the ownership document
         PropertyDocument.objects.create(
-            property=property,
+            property=property_obj,
             document_type=document_type,
             document=document,
         )
-
+        
         PropertyVerification.objects.create(
-            property=property,
-            status=PropertyVerification.Status.PENDING,
+            property=property_obj,
+            status="pending",
         )
 
-        return property
+        return property_obj
+
+# ============================================================
+# OWNER PUBLIC INFO
+# Only exposes fields safe to show on a listing contact card.
+# Never includes password, email, or sensitive profile data.
+# ============================================================
+
+class OwnerPublicSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = User
+        fields = ["id", "full_name", "phone_number", "phone_verified"]
+
+# ============================================================
+# NESTED PROPERTY (used inside listing responses)
+# ============================================================
+
+class ListingPropertySerializer(serializers.ModelSerializer):
+
+    owner         = OwnerPublicSerializer(read_only=True)
+    property_type = PropertyTypeSerializer(read_only=True)
+    location      = LocationSerializer(read_only=True)
+
+    class Meta:
+        model = Property
+        fields = [
+            "id",
+            "owner",
+            "property_type",
+            "location",
+            "bedrooms",
+            "bathrooms",
+            "area_sqm",
+            "description",
+        ]
 
 # ============================================================
 # PROPERTY LISTING
@@ -180,42 +200,16 @@ class PropertySerializer(serializers.ModelSerializer):
 
 class PropertyListingSerializer(serializers.ModelSerializer):
 
+    # On READ  → return full nested property (owner + type + location expanded)
+    # On WRITE → accept the bare property FK id as normal
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["property"] = ListingPropertySerializer(instance.property).data
+        return rep
+
     class Meta:
         model = PropertyListing
-
-        fields = "__all__"
-
-        read_only_fields = (
-            "id",
-            "published_at",
-            "created_at",
-            "updated_at",
-        )
-
-    def validate_property(self, property):
-
-        # Property must have a verification record.
-        try:
-            verification = property.verification
-        except PropertyVerification.DoesNotExist:
-            raise serializers.ValidationError(
-                "This property has not been submitted for verification."
-            )
-
-        # Property must be verified.
-        if verification.status != PropertyVerification.Status.VERIFIED:
-            raise serializers.ValidationError(
-                "This property must be verified before it can be listed."
-            )
-
-        # Property must have at least one document.
-        if not property.documents.exists():
-            raise serializers.ValidationError(
-                "This property must have a document before it can be listed."
-            )
-
-        return property
-
+        fields = "all"
 
 # ============================================================
 # PROPERTY IMAGE
@@ -225,13 +219,7 @@ class PropertyImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyImage
-        fields = "__all__"
-
-        read_only_fields = (
-            "id",
-            "created_at",
-        )
-
+        fields = "all"
 
 # ============================================================
 # FAVORITE
@@ -241,23 +229,14 @@ class FavoriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Favorite
-        fields = "__all__"
+        fields = "all"
 
-        read_only_fields = (
-            "id",
-            "created_at",
-        )
-
+# ============================================================
+# PAYMENT
+# ============================================================
 
 class PaymentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Payment
-        fields = "__all__"
-        read_only_fields = (
-            "status",
-            "verified_by",
-            "verified_at",
-            "created_at",
-            "updated_at",
-        )
+        fields = "all"
