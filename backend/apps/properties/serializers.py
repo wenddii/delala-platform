@@ -131,9 +131,6 @@ class PropertySerializer(serializers.ModelSerializer):
             "area_sqm",
             "description",
 
-            # Property workflow
-            "listing_status",
-
             "created_at",
             "updated_at",
 
@@ -148,7 +145,6 @@ class PropertySerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "owner",
-            "listing_status",
             "created_at",
             "updated_at",
             "verification_status",
@@ -162,8 +158,7 @@ class PropertySerializer(serializers.ModelSerializer):
 
         property = Property.objects.create(
             owner=self.context["request"].user,
-            listing_status=Property.ListingStatus.PENDING_VERIFICATION,
-            **validated_data
+          
         )
 
         PropertyDocument.objects.create(
