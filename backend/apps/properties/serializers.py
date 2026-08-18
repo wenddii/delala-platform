@@ -116,10 +116,7 @@ class PropertySerializer(serializers.ModelSerializer):
         read_only=True
     )
 
-    # Property workflow status
-    listing_status = serializers.CharField(
-        read_only=True
-    )
+   
 
     class Meta:
         model = Property
