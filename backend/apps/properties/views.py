@@ -239,18 +239,12 @@ class FavoriteDetailView(generics.RetrieveUpdateDestroyAPIView):
 # ============================================================
 
 class PaymentListView(generics.ListCreateAPIView):
-
+    queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        return Payment.objects.filter(
-            user=self.request.user
-        ).select_related(
-            "listing",
-            "user",
-            "verified_by",
-        )
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 class PaymentDetailView(generics.RetrieveUpdateDestroyAPIView):
