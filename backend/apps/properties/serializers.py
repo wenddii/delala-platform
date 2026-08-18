@@ -22,7 +22,7 @@ class PropertyTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyType
-        fields = "all"
+        fields = "__all__"
 
 # ============================================================
 # LOCATION
@@ -32,7 +32,7 @@ class LocationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Location
-        fields = "all"
+        fields = "__all__"
 
 # ============================================================
 # PROPERTY DOCUMENT
@@ -209,7 +209,7 @@ class PropertyListingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyListing
-        fields = "all"
+        fields = "__all__"
 
 # ============================================================
 # PROPERTY IMAGE
@@ -219,7 +219,7 @@ class PropertyImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyImage
-        fields = "all"
+        fields = "__all__"
 
 # ============================================================
 # FAVORITE
@@ -229,7 +229,7 @@ class FavoriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Favorite
-        fields = "all"
+        fields = "__all__"
 
 # ============================================================
 # PAYMENT
@@ -239,4 +239,4 @@ class PaymentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Payment
-        fields = "all"
+        fields = "__all__"
