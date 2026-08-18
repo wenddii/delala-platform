@@ -120,9 +120,13 @@ class PropertyListingListView(generics.ListCreateAPIView):
 class PropertyListingDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     serializer_class = PropertyListingSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
+        # GET — anyone can view any listing
+        # PATCH/DELETE — only the owner can modify their own listings
+        if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return PropertyListing.objects.all()
         return PropertyListing.objects.filter(
             property__owner=self.request.user
         )
