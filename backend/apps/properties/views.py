@@ -1,4 +1,4 @@
-[8/19/2026 10:08 AM] Befekadu Tele_partner: from rest_framework import generics
+from rest_framework import generics
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly, IsAuthenticated
 
 from .models import (
@@ -91,9 +91,6 @@ class PropertyDetailView(generics.RetrieveUpdateDestroyAPIView):
             ).all()
         return Property.objects.filter(owner=self.request.user)
 
-# ============================================================
-# PROPERTY LISTINGS
-# ============================================================
 
 class PropertyListingListView(generics.ListCreateAPIView):
 
@@ -128,15 +125,10 @@ class PropertyListingDetailView(generics.RetrieveUpdateDestroyAPIView):
 # ============================================================
 
 class PropertyImageListView(generics.ListCreateAPIView):
-[8/19/2026 10:08 AM] Befekadu Tele_partner: serializer_class = PropertyImageSerializer
+    serializer_class = PropertyImageSerializer
     permission_classes = [AllowAny]
 
-    # FIX 1: method was defined outside the class (wrong indentation) so
-    # Django never called it — endpoint always returned an empty list.
-    # FIX 2: queryset now returns ALL images so any visitor can see photos
-    # for any listing. Write operations are still gated by AllowAny here
-    # but upload is controlled by the frontend (only authenticated users
-    # reach the AddProperty form).
+   
     def get_queryset(self):
         return PropertyImage.objects.select_related("property").all()
 
