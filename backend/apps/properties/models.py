@@ -15,9 +15,6 @@ class PropertyType(models.Model):
         return self.name
 
 
-# ============================================================
-# LOCATION
-# ============================================================
 
 class Location(models.Model):
 
@@ -291,6 +288,8 @@ class PropertyImage(models.Model):
 # FAVORITE
 # ============================================================
 
+from django.db import models
+
 class Favorite(models.Model):
 
     user = models.ForeignKey(
@@ -309,12 +308,19 @@ class Favorite(models.Model):
         auto_now_add=True
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "property_listing"],
+                name="unique_user_favorite"
+            )
+        ]
+
     def __str__(self):
         return (
             f"{self.user.phone_number} - "
             f"{self.property_listing.title}"
         )
-
 
 class Payment(models.Model):
 

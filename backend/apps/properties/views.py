@@ -65,7 +65,7 @@ class LocationDetailView(generics.RetrieveUpdateDestroyAPIView):
 class PropertyListView(generics.ListCreateAPIView):
 
     serializer_class = PropertySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
         return Property.objects.select_related(
@@ -223,7 +223,10 @@ class FavoriteListView(generics.ListCreateAPIView):
         return Favorite.objects.filter(
             user=self.request.user
         )
-
+    def perform_create(self, serializer):
+        serializer.save(
+            user=self.request.user
+        )
 
 class FavoriteDetailView(generics.RetrieveUpdateDestroyAPIView):
 
