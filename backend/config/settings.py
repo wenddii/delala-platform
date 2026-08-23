@@ -213,6 +213,8 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "https://delala-react-frontend.vercel.app",
+    "http://localhost:8080",                     # Default Flutter web port
+    "http://localhost:55432",
 ]
 
 

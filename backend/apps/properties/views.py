@@ -244,3 +244,7 @@ class PaymentDetailView(generics.RetrieveUpdateDestroyAPIView):
             "user",
             "verified_by",
         )
+
+
+
+        
