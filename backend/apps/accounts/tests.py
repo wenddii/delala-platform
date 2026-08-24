@@ -580,3 +580,302 @@ class UserProfileAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.user.refresh_from_db()
         self.assertFalse(self.user.phone_verified)
+
+
+class ForgotPasswordAndResetPasswordAPITests(APITestCase):
+    """
+    Tests for Password Reset OTP flow:
+    1. /api/accounts/forgot-password/
+    2. /api/accounts/verify-reset-otp/
+    3. /api/accounts/reset-password/
+    """
+
+    def setUp(self):
+        self.forgot_password_url = reverse("forgot_password")
+        self.verify_reset_otp_url = reverse("verify_reset_otp")
+        self.reset_password_url = reverse("reset_password")
+        self.login_url = reverse("login")
+
+        self.phone_number = "+251911998877"
+        self.old_password = "InitialPassword123!"
+        self.user = User.objects.create_user(
+            phone_number=self.phone_number,
+            full_name="Tirunesh Test",
+            email="tirunesh@example.com",
+            password=self.old_password,
+        )
+        # Ensure user phone_verified state is False initially to verify it is NOT modified during password reset
+        self.assertFalse(self.user.phone_verified)
+
+    def test_forgot_password_success(self):
+        """Test requesting password reset for an existing user generates password_reset OTP."""
+        response = self.client.post(
+            self.forgot_password_url,
+            {"phone_number": self.phone_number},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("message", response.data)
+
+        # Check OTP record created
+        otp_qs = PhoneOTP.objects.filter(
+            phone_number=self.phone_number,
+            purpose="password_reset",
+            is_used=False,
+        )
+        self.assertEqual(otp_qs.count(), 1)
+        otp = otp_qs.first()
+        self.assertFalse(otp.is_verified)
+        self.assertFalse(otp.is_expired())
+
+    def test_forgot_password_nonexistent_user_no_enumeration(self):
+        """Test requesting password reset for a non-existing user returns standard response without creating OTP."""
+        nonexistent_phone = "+251900112233"
+        response = self.client.post(
+            self.forgot_password_url,
+            {"phone_number": nonexistent_phone},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(
+            PhoneOTP.objects.filter(phone_number=nonexistent_phone).exists()
+        )
+
+    def test_forgot_password_replaces_older_reset_otps(self):
+        """Test that requesting password reset again deletes older password reset OTPs for that phone."""
+        PhoneOTP.objects.create(
+            phone_number=self.phone_number,
+            code="111111",
+            expires_at=PhoneOTP.expiry_time(),
+            purpose="password_reset",
+        )
+        self.assertEqual(
+            PhoneOTP.objects.filter(phone_number=self.phone_number, purpose="password_reset").count(),
+            1,
+        )
+
+        self.client.post(
+            self.forgot_password_url,
+            {"phone_number": self.phone_number},
+            format="json",
+        )
+
+        self.assertEqual(
+            PhoneOTP.objects.filter(phone_number=self.phone_number, purpose="password_reset").count(),
+            1,
+        )
+        self.assertFalse(
+            PhoneOTP.objects.filter(phone_number=self.phone_number, code="111111").exists()
+        )
+
+    def test_verify_reset_otp_success_does_not_modify_user_phone_verified(self):
+        """Test verifying reset OTP marks OTP as verified but does NOT mark user as phone_verified."""
+        otp = PhoneOTP.objects.create(
+            phone_number=self.phone_number,
+            code="123456",
+            expires_at=PhoneOTP.expiry_time(),
+            purpose="password_reset",
+        )
+
+        response = self.client.post(
+            self.verify_reset_otp_url,
+            {"phone_number": self.phone_number, "otp": "123456"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["message"],
+            "OTP verified successfully. You can now reset your password.",
+        )
+
+        otp.refresh_from_db()
+        self.assertTrue(otp.is_verified)
+        self.assertFalse(otp.is_used)
+
+        # Ensure user's phone_verified was NOT changed
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.phone_verified)
+
+    def test_verify_reset_otp_with_code_alias(self):
+        """Test verify reset OTP also accepts 'code' parameter in payload."""
+        PhoneOTP.objects.create(
+            phone_number=self.phone_number,
+            code="654321",
+            expires_at=PhoneOTP.expiry_time(),
+            purpose="password_reset",
+        )
+
+        response = self.client.post(
+            self.verify_reset_otp_url,
+            {"phone_number": self.phone_number, "code": "654321"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_verify_reset_otp_invalid_code(self):
+        """Test verifying reset OTP with incorrect code fails with 400."""
+        PhoneOTP.objects.create(
+            phone_number=self.phone_number,
+            code="123456",
+            expires_at=PhoneOTP.expiry_time(),
+            purpose="password_reset",
+        )
+
+        response = self.client.post(
+            self.verify_reset_otp_url,
+            {"phone_number": self.phone_number, "otp": "000000"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("code", response.data)
+
+    def test_verify_reset_otp_expired(self):
+        """Test verifying expired reset OTP fails."""
+        past_time = timezone.now() - timedelta(minutes=10)
+        PhoneOTP.objects.create(
+            phone_number=self.phone_number,
+            code="123456",
+            expires_at=past_time,
+            purpose="password_reset",
+        )
+
+        response = self.client.post(
+            self.verify_reset_otp_url,
+            {"phone_number": self.phone_number, "otp": "123456"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("code", response.data)
+
+    def test_reset_password_full_success_flow(self):
+        """Test end-to-end password reset flow: forgot -> verify -> reset -> login with new password."""
+        # 1. Request forgot password
+        forgot_res = self.client.post(
+            self.forgot_password_url,
+            {"phone_number": self.phone_number},
+            format="json",
+        )
+        self.assertEqual(forgot_res.status_code, status.HTTP_200_OK)
+
+        otp_obj = PhoneOTP.objects.get(
+            phone_number=self.phone_number,
+            purpose="password_reset",
+        )
+
+        # 2. Verify reset OTP
+        verify_res = self.client.post(
+            self.verify_reset_otp_url,
+            {"phone_number": self.phone_number, "otp": otp_obj.code},
+            format="json",
+        )
+        self.assertEqual(verify_res.status_code, status.HTTP_200_OK)
+
+        # 3. Reset password
+        new_password = "BrandNewSecurePassword123!"
+        reset_res = self.client.post(
+            self.reset_password_url,
+            {
+                "phone_number": self.phone_number,
+                "new_password": new_password,
+                "confirm_password": new_password,
+            },
+            format="json",
+        )
+        self.assertEqual(reset_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            reset_res.data["message"],
+            "Password has been reset successfully.",
+        )
+
+        # 4. Verify password in DB has changed and user can login with new password
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(new_password))
+        self.assertFalse(self.user.check_password(self.old_password))
+
+        login_res = self.client.post(
+            self.login_url,
+            {"phone_number": self.phone_number, "password": new_password},
+            format="json",
+        )
+        self.assertEqual(login_res.status_code, status.HTTP_200_OK)
+        self.assertIn("access", login_res.data)
+
+    def test_reset_password_unverified_otp_rejected(self):
+        """Test resetting password without verifying OTP first fails with 400."""
+        # Generate OTP but do NOT verify it
+        PhoneOTP.objects.create(
+            phone_number=self.phone_number,
+            code="123456",
+            expires_at=PhoneOTP.expiry_time(),
+            purpose="password_reset",
+            is_verified=False,
+        )
+
+        response = self.client.post(
+            self.reset_password_url,
+            {
+                "phone_number": self.phone_number,
+                "new_password": "NewPassword123!",
+                "confirm_password": "NewPassword123!",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("detail", response.data)
+
+    def test_reset_password_mismatched_passwords_rejected(self):
+        """Test resetting password with mismatching new_password and confirm_password."""
+        PhoneOTP.objects.create(
+            phone_number=self.phone_number,
+            code="123456",
+            expires_at=PhoneOTP.expiry_time(),
+            purpose="password_reset",
+            is_verified=True,
+        )
+
+        response = self.client.post(
+            self.reset_password_url,
+            {
+                "phone_number": self.phone_number,
+                "new_password": "NewPassword123!",
+                "confirm_password": "DifferentPassword123!",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("confirm_password", response.data)
+
+    def test_reset_password_cannot_be_reused(self):
+        """Test that a reset authorization cannot be reused a second time."""
+        PhoneOTP.objects.create(
+            phone_number=self.phone_number,
+            code="123456",
+            expires_at=PhoneOTP.expiry_time(),
+            purpose="password_reset",
+            is_verified=True,
+        )
+
+        # First reset attempt succeeds
+        res1 = self.client.post(
+            self.reset_password_url,
+            {
+                "phone_number": self.phone_number,
+                "new_password": "FirstNewPassword123!",
+                "confirm_password": "FirstNewPassword123!",
+            },
+            format="json",
+        )
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+
+        # Second reset attempt must fail
+        res2 = self.client.post(
+            self.reset_password_url,
+            {
+                "phone_number": self.phone_number,
+                "new_password": "SecondNewPassword123!",
+                "confirm_password": "SecondNewPassword123!",
+            },
+            format="json",
+        )
+        self.assertEqual(res2.status_code, status.HTTP_400_BAD_REQUEST)
+

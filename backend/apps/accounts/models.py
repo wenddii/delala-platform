@@ -105,12 +105,27 @@ class UserProfile(models.Model):
 
 class PhoneOTP(models.Model):
 
+    PURPOSE_CHOICES = (
+        ("registration", "Registration"),
+        ("password_reset", "Password Reset"),
+    )
+
     phone_number = models.CharField(
         max_length=20
     )
 
     code = models.CharField(
         max_length=6
+    )
+
+    purpose = models.CharField(
+        max_length=20,
+        choices=PURPOSE_CHOICES,
+        default="registration",
+    )
+
+    is_verified = models.BooleanField(
+        default=False
     )
 
     created_at = models.DateTimeField(

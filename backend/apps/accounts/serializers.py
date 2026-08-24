@@ -1,6 +1,8 @@
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import User, UserProfile , PhoneOTP
+from .models import User, UserProfile, PhoneOTP
 from apps.properties.models import Property
 
 
@@ -191,6 +193,7 @@ class VerifyOTPSerializer(serializers.Serializer):
             otp = PhoneOTP.objects.filter(
                 phone_number=phone_number,
                 code=code,
+                purpose="registration",
                 is_used=False,
             ).latest("created_at")
 
@@ -211,5 +214,145 @@ class VerifyOTPSerializer(serializers.Serializer):
             )
 
         attrs["otp"] = otp
+
+        return attrs
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+
+    phone_number = serializers.CharField(
+        max_length=20
+    )
+
+
+class VerifyResetOTPSerializer(serializers.Serializer):
+
+    phone_number = serializers.CharField(
+        max_length=20
+    )
+
+    otp = serializers.CharField(
+        max_length=6,
+        required=False
+    )
+
+    code = serializers.CharField(
+        max_length=6,
+        required=False
+    )
+
+    def validate(self, attrs):
+
+        phone_number = attrs["phone_number"]
+        code = attrs.get("otp") or attrs.get("code")
+
+        if not code:
+            raise serializers.ValidationError(
+                {
+                    "otp": "OTP code is required."
+                }
+            )
+
+        try:
+
+            otp_obj = PhoneOTP.objects.filter(
+                phone_number=phone_number,
+                code=code,
+                purpose="password_reset",
+                is_used=False,
+            ).latest("created_at")
+
+        except PhoneOTP.DoesNotExist:
+
+            raise serializers.ValidationError(
+                {
+                    "code": "Invalid OTP."
+                }
+            )
+
+        if otp_obj.is_expired():
+
+            raise serializers.ValidationError(
+                {
+                    "code": "OTP has expired."
+                }
+            )
+
+        attrs["otp_obj"] = otp_obj
+
+        return attrs
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+
+    phone_number = serializers.CharField(
+        max_length=20
+    )
+
+    new_password = serializers.CharField(
+        write_only=True
+    )
+
+    confirm_password = serializers.CharField(
+        write_only=True
+    )
+
+    def validate(self, attrs):
+
+        phone_number = attrs["phone_number"]
+        new_password = attrs["new_password"]
+        confirm_password = attrs["confirm_password"]
+
+        if new_password != confirm_password:
+            raise serializers.ValidationError(
+                {
+                    "confirm_password": "Passwords do not match."
+                }
+            )
+
+        user = User.objects.filter(phone_number=phone_number).first()
+        if not user:
+            raise serializers.ValidationError(
+                {
+                    "phone_number": "No account found with this phone number."
+                }
+            )
+
+        try:
+
+            otp_obj = PhoneOTP.objects.filter(
+                phone_number=phone_number,
+                purpose="password_reset",
+                is_verified=True,
+                is_used=False,
+            ).latest("created_at")
+
+        except PhoneOTP.DoesNotExist:
+
+            raise serializers.ValidationError(
+                {
+                    "detail": "Password reset authorization not found or OTP has not been verified."
+                }
+            )
+
+        if otp_obj.is_expired():
+
+            raise serializers.ValidationError(
+                {
+                    "detail": "Password reset session has expired. Please request a new OTP."
+                }
+            )
+
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError(
+                {
+                    "new_password": list(error.messages)
+                }
+            )
+
+        attrs["user"] = user
+        attrs["otp_obj"] = otp_obj
 
         return attrs
