@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import User, UserProfile
+from .models import User, UserProfile , PhoneOTP
 from apps.properties.models import Property
 
 
@@ -25,6 +25,13 @@ class RegisterSerializer(serializers.ModelSerializer):
             "email",
             "password",
         ]
+
+    def validate_email(self, value):
+        if value and User.objects.filter(email=value).exists():
+            raise serializers.ValidationError(
+                "A user with that email already exists."
+            )
+        return value
 
     def create(self, validated_data):
 
@@ -146,3 +153,63 @@ class ProfileSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class SendOTPSerializer(serializers.Serializer):
+
+    phone_number = serializers.CharField(
+        max_length=20
+    )
+
+    def validate_phone_number(self, value):
+
+        if not User.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError(
+                "No account found with this phone number."
+            )
+
+        return value
+
+
+class VerifyOTPSerializer(serializers.Serializer):
+
+    phone_number = serializers.CharField(
+        max_length=20
+    )
+
+    code = serializers.CharField(
+        max_length=6
+    )
+
+    def validate(self, attrs):
+
+        phone_number = attrs["phone_number"]
+        code = attrs["code"]
+
+        try:
+
+            otp = PhoneOTP.objects.filter(
+                phone_number=phone_number,
+                code=code,
+                is_used=False,
+            ).latest("created_at")
+
+        except PhoneOTP.DoesNotExist:
+
+            raise serializers.ValidationError(
+                {
+                    "code": "Invalid OTP."
+                }
+            )
+
+        if otp.is_expired():
+
+            raise serializers.ValidationError(
+                {
+                    "code": "OTP has expired."
+                }
+            )
+
+        attrs["otp"] = otp
+
+        return attrs

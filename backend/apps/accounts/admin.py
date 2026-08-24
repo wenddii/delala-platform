@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import User, UserProfile
+from .models import User, UserProfile, PhoneOTP
 
 
 class UserProfileInline(admin.StackedInline):
@@ -221,3 +221,31 @@ class UserProfileAdmin(admin.ModelAdmin):
 
         return "\n".join(result)
 
+@admin.register(PhoneOTP)
+class PhoneOTPAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "phone_number",
+        "code",
+        "is_used",
+        "created_at",
+        "expires_at",
+    )
+
+    list_filter = (
+        "is_used",
+        "created_at",
+    )
+
+    search_fields = (
+        "phone_number",
+        "code",
+    )
+
+    readonly_fields = (
+        "created_at",
+    )
+
+    ordering = (
+        "-created_at",
+    )
