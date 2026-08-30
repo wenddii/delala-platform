@@ -175,15 +175,22 @@ class OwnerPublicSerializer(serializers.ModelSerializer):
 # NESTED PROPERTY (used inside listing responses)
 # ============================================================
 
+from rest_framework import serializers
+
+from .models import PropertyListing, Property
+
+
 class ListingPropertySerializer(serializers.ModelSerializer):
 
-    owner         = OwnerPublicSerializer(read_only=True)
+    owner = OwnerPublicSerializer(read_only=True)
     property_type = PropertyTypeSerializer(read_only=True)
-    location      = LocationSerializer(read_only=True)
+    location = LocationSerializer(read_only=True)
+
+    verification_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Property
-        fields = [
+        fields = (
             "id",
             "owner",
             "property_type",
@@ -192,19 +199,36 @@ class ListingPropertySerializer(serializers.ModelSerializer):
             "bathrooms",
             "area_sqm",
             "description",
-        ]
+            "verification_status",
+        )
 
-# ============================================================
-# PROPERTY LISTING
-# ============================================================
+    def get_verification_status(self, obj):
+        try:
+            return obj.verification.status
+        except Property.verification.RelatedObjectDoesNotExist:
+            return "pending"
+
 
 class PropertyListingSerializer(serializers.ModelSerializer):
+
+    # Accept property ID when creating/updating
+    property = serializers.PrimaryKeyRelatedField(
+        queryset=Property.objects.all(),
+        write_only=True,
+    )
+
+    # Return the full property object when reading
+    property_details = ListingPropertySerializer(
+        source="property",
+        read_only=True,
+    )
 
     class Meta:
         model = PropertyListing
         fields = (
             "id",
             "property",
+            "property_details",
             "title",
             "listing_type",
             "price",
@@ -218,15 +242,11 @@ class PropertyListingSerializer(serializers.ModelSerializer):
 
         read_only_fields = (
             "id",
+            "property_details",
+            "published_at",
             "created_at",
             "updated_at",
-            "published_at",
         )
-
-# ============================================================
-# PROPERTY IMAGE
-# ============================================================
-
 class PropertyImageSerializer(serializers.ModelSerializer):
 
     class Meta:
