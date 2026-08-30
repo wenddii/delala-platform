@@ -1,5 +1,6 @@
 from rest_framework import generics
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly, IsAuthenticated
+from django.utils import timezone
 
 from .models import (
     PropertyType,
@@ -57,22 +58,31 @@ class LocationDetailView(generics.RetrieveUpdateDestroyAPIView):
 # PROPERTIES
 # ============================================================
 
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+
 class PropertyListView(generics.ListCreateAPIView):
 
     serializer_class = PropertySerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        return Property.objects.select_related(
-            "owner",
-            "property_type",
-            "location",
-            "verification",
-        ).prefetch_related(
-            "documents",
-            "images",
-        ).all()
+        return (
+            Property.objects.select_related(
+                "owner",
+                "property_type",
+                "location",
+                "verification",
+            )
+            .prefetch_related(
+                "documents",
+                "images",
+            )
+        )
 
+    def perform_create(self, serializer):
+        serializer.save()
+        
 class PropertyDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     serializer_class = PropertySerializer

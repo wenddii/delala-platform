@@ -200,16 +200,28 @@ class ListingPropertySerializer(serializers.ModelSerializer):
 
 class PropertyListingSerializer(serializers.ModelSerializer):
 
-    # On READ  → return full nested property (owner + type + location expanded)
-    # On WRITE → accept the bare property FK id as normal
-    def to_representation(self, instance):
-        rep = super().to_representation(instance)
-        rep["property"] = ListingPropertySerializer(instance.property).data
-        return rep
-
     class Meta:
         model = PropertyListing
-        fields = "__all__"
+        fields = (
+            "id",
+            "property",
+            "title",
+            "listing_type",
+            "price",
+            "currency",
+            "price_period",
+            "status",
+            "published_at",
+            "created_at",
+            "updated_at",
+        )
+
+        read_only_fields = (
+            "id",
+            "created_at",
+            "updated_at",
+            "published_at",
+        )
 
 # ============================================================
 # PROPERTY IMAGE
