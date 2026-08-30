@@ -165,27 +165,31 @@ class PropertySerializer(serializers.ModelSerializer):
 # Never includes password, email, or sensitive profile data.
 # ============================================================
 
+# ============================================================
+# OWNER PUBLIC INFO
+# ============================================================
+
 class OwnerPublicSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "full_name", "phone_number", "phone_verified"]
+        fields = (
+            "id",
+            "full_name",
+            "phone_number",
+            "phone_verified",
+        )
+
 
 # ============================================================
-# NESTED PROPERTY (used inside listing responses)
+# PROPERTY (Nested inside listings)
 # ============================================================
-
-from rest_framework import serializers
-
-from .models import PropertyListing, Property
-
 
 class ListingPropertySerializer(serializers.ModelSerializer):
 
     owner = OwnerPublicSerializer(read_only=True)
     property_type = PropertyTypeSerializer(read_only=True)
     location = LocationSerializer(read_only=True)
-
     verification_status = serializers.SerializerMethodField()
 
     class Meta:
@@ -203,21 +207,22 @@ class ListingPropertySerializer(serializers.ModelSerializer):
         )
 
     def get_verification_status(self, obj):
-        try:
+        if hasattr(obj, "verification"):
             return obj.verification.status
-        except Property.verification.RelatedObjectDoesNotExist:
-            return "pending"
+        return "pending"
 
+
+# ============================================================
+# PROPERTY LISTING
+# ============================================================
 
 class PropertyListingSerializer(serializers.ModelSerializer):
 
-    # Accept property ID when creating/updating
     property = serializers.PrimaryKeyRelatedField(
         queryset=Property.objects.all(),
         write_only=True,
     )
 
-    # Return the full property object when reading
     property_details = ListingPropertySerializer(
         source="property",
         read_only=True,
@@ -247,11 +252,18 @@ class PropertyListingSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+
+# ============================================================
+# PROPERTY IMAGE
+# ============================================================
+
 class PropertyImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyImage
         fields = "__all__"
+
 
 # ============================================================
 # FAVORITE
@@ -262,6 +274,8 @@ class FavoriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Favorite
         fields = "__all__"
+        read_only_fields = ("user",)
+
 
 # ============================================================
 # PAYMENT
@@ -272,3 +286,4 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = "__all__"
+        read_only_fields = ("user",)
