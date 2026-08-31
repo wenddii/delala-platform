@@ -116,6 +116,9 @@ class PropertyListingListView(generics.ListCreateAPIView):
             "property__verification",
         ).all()
 
+    def perform_create(self, serializer):
+        serializer.save(status=PropertyListing.Status.DRAFT)
+
 class PropertyListingDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     serializer_class = PropertyListingSerializer

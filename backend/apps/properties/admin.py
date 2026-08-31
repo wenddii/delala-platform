@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html, mark_safe
+from django.utils import timezone
 from .models import PropertyVerification
 
 
@@ -545,3 +546,19 @@ class PaymentAdmin(admin.ModelAdmin):
         return "No screenshot uploaded"
 
     payment_screenshot_preview.short_description = "Screenshot Preview"
+
+    def save_model(self, request, obj, form, change):
+        if change:
+            old_status = form.initial.get("status")
+            if (
+                old_status == Payment.Status.PENDING
+                and obj.status == Payment.Status.APPROVED
+            ):
+                listing = getattr(obj, "listing", None)
+                if listing and listing.status == PropertyListing.Status.DRAFT:
+                    listing.status = PropertyListing.Status.PUBLISHED
+                    if not listing.published_at:
+                        listing.published_at = timezone.now()
+                    listing.save()
+
+        super().save_model(request, obj, form, change)
