@@ -77,6 +77,7 @@ class PropertyListView(generics.ListCreateAPIView):
             .prefetch_related(
                 "documents",
                 "images",
+                "listings",
             )
         )
 
@@ -89,17 +90,19 @@ class PropertyDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
+        qs = Property.objects.select_related(
+            "owner",
+            "property_type",
+            "location",
+            "verification",
+        ).prefetch_related(
+            "documents",
+            "images",
+            "listings",
+        )
         if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
-            return Property.objects.select_related(
-                "owner",
-                "property_type",
-                "location",
-                "verification",
-            ).prefetch_related(
-                "documents",
-                "images",
-            ).all()
-        return Property.objects.filter(owner=self.request.user)
+            return qs.all()
+        return qs.filter(owner=self.request.user)
 
 
 class PropertyListingListView(generics.ListCreateAPIView):
@@ -127,9 +130,16 @@ class PropertyListingDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         # GET — anyone can view any listing
         # PATCH/DELETE — only the owner can modify their own listings
+        qs = PropertyListing.objects.select_related(
+            "property",
+            "property__owner",
+            "property__property_type",
+            "property__location",
+            "property__verification",
+        )
         if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
-            return PropertyListing.objects.all()
-        return PropertyListing.objects.filter(
+            return qs.all()
+        return qs.filter(
             property__owner=self.request.user
         )
 

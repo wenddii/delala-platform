@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from apps.accounts.models import User
 
@@ -103,6 +104,8 @@ class PropertySerializer(serializers.ModelSerializer):
         default="pending",
     )
 
+    has_listing = serializers.SerializerMethodField()
+
     class Meta:
         model = Property
         fields = (
@@ -121,6 +124,7 @@ class PropertySerializer(serializers.ModelSerializer):
             "document",
             # read-only — resolved from related verification row
             "verification_status",
+            "has_listing",
         )
 
         read_only_fields = (
@@ -129,7 +133,15 @@ class PropertySerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "verification_status",
+            "has_listing",
         )
+
+    def get_has_listing(self, obj):
+        if hasattr(obj, "has_listing"):
+            return bool(obj.has_listing)
+        if hasattr(obj, "_prefetched_objects_cache") and "listings" in obj._prefetched_objects_cache:
+            return len(obj.listings.all()) > 0
+        return obj.listings.exists()
 
     @transaction.atomic
     def create(self, validated_data):
@@ -207,9 +219,10 @@ class ListingPropertySerializer(serializers.ModelSerializer):
         )
 
     def get_verification_status(self, obj):
-        if hasattr(obj, "verification"):
+        try:
             return obj.verification.status
-        return "pending"
+        except (PropertyVerification.DoesNotExist, AttributeError, ObjectDoesNotExist):
+            return "pending"
 
 
 # ============================================================
@@ -220,7 +233,21 @@ class PropertyListingSerializer(serializers.ModelSerializer):
 
     property = serializers.PrimaryKeyRelatedField(
         queryset=Property.objects.all(),
-        write_only=True,
+    )
+
+    owner = OwnerPublicSerializer(
+        source="property.owner",
+        read_only=True,
+    )
+
+    property_type = PropertyTypeSerializer(
+        source="property.property_type",
+        read_only=True,
+    )
+
+    location = LocationSerializer(
+        source="property.location",
+        read_only=True,
     )
 
     property_details = ListingPropertySerializer(
@@ -233,6 +260,9 @@ class PropertyListingSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "property",
+            "owner",
+            "property_type",
+            "location",
             "property_details",
             "title",
             "listing_type",
@@ -247,11 +277,24 @@ class PropertyListingSerializer(serializers.ModelSerializer):
 
         read_only_fields = (
             "id",
+            "owner",
+            "property_type",
+            "location",
             "property_details",
             "published_at",
             "created_at",
             "updated_at",
         )
+
+    def validate_property(self, value):
+        query = PropertyListing.objects.filter(property=value)
+        if self.instance:
+            query = query.exclude(pk=self.instance.pk)
+        if query.exists():
+            raise serializers.ValidationError(
+                "This property already has a listing."
+            )
+        return value
 
 
 # ============================================================
