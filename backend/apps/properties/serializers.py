@@ -236,7 +236,7 @@ class PropertyListingSerializer(serializers.ModelSerializer):
     )
 
     owner = OwnerPublicSerializer(
-        source="property.owner.full_name",
+        source="property.owner",
         read_only=True,
     )
 
