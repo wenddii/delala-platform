@@ -233,21 +233,7 @@ class PropertyListingSerializer(serializers.ModelSerializer):
 
     property = serializers.PrimaryKeyRelatedField(
         queryset=Property.objects.all(),
-    )
-
-    owner = OwnerPublicSerializer(
-        source="property.owner",
-        read_only=True,
-    )
-
-    property_type = PropertyTypeSerializer(
-        source="property.property_type",
-        read_only=True,
-    )
-
-    location = LocationSerializer(
-        source="property.location",
-        read_only=True,
+        write_only=True,
     )
 
     property_details = ListingPropertySerializer(
@@ -260,9 +246,6 @@ class PropertyListingSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "property",
-            "owner",
-            "property_type",
-            "location",
             "property_details",
             "title",
             "listing_type",
@@ -277,9 +260,6 @@ class PropertyListingSerializer(serializers.ModelSerializer):
 
         read_only_fields = (
             "id",
-            "owner",
-            "property_type",
-            "location",
             "property_details",
             "published_at",
             "created_at",
