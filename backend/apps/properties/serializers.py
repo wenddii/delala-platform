@@ -81,6 +81,24 @@ class PropertyVerificationSerializer(serializers.ModelSerializer):
         )
 
 # ============================================================
+# OWNER PUBLIC INFO
+# Only exposes fields safe to show on a listing contact card.
+# Never includes password, email, or sensitive profile data.
+# ============================================================
+
+class OwnerPublicSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "full_name",
+            "phone_number",
+            "phone_verified",
+        )
+
+
+# ============================================================
 # PROPERTY
 # ============================================================
 
@@ -104,6 +122,11 @@ class PropertySerializer(serializers.ModelSerializer):
         default="pending",
     )
 
+    owner_details = OwnerPublicSerializer(
+        source="owner",
+        read_only=True,
+    )
+
     has_listing = serializers.SerializerMethodField()
 
     class Meta:
@@ -111,6 +134,7 @@ class PropertySerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "owner",
+            "owner_details",
             "property_type",
             "location",
             "bedrooms",
@@ -130,6 +154,7 @@ class PropertySerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "owner",
+            "owner_details",
             "created_at",
             "updated_at",
             "verification_status",
@@ -171,27 +196,6 @@ class PropertySerializer(serializers.ModelSerializer):
 
         return property_obj
 
-# ============================================================
-# OWNER PUBLIC INFO
-# Only exposes fields safe to show on a listing contact card.
-# Never includes password, email, or sensitive profile data.
-# ============================================================
-
-# ============================================================
-# OWNER PUBLIC INFO
-# ============================================================
-
-class OwnerPublicSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = User
-        fields = (
-            "id",
-            "full_name",
-            "phone_number",
-            "phone_verified",
-        )
-
 
 # ============================================================
 # PROPERTY (Nested inside listings)
@@ -199,7 +203,8 @@ class OwnerPublicSerializer(serializers.ModelSerializer):
 
 class ListingPropertySerializer(serializers.ModelSerializer):
 
-    owner = OwnerPublicSerializer(read_only=True)
+    owner = serializers.PrimaryKeyRelatedField(read_only=True)
+    owner_details = OwnerPublicSerializer(source="owner", read_only=True)
     property_type = PropertyTypeSerializer(read_only=True)
     location = LocationSerializer(read_only=True)
     verification_status = serializers.SerializerMethodField()
@@ -209,6 +214,7 @@ class ListingPropertySerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "owner",
+            "owner_details",
             "property_type",
             "location",
             "bedrooms",
@@ -233,7 +239,26 @@ class PropertyListingSerializer(serializers.ModelSerializer):
 
     property = serializers.PrimaryKeyRelatedField(
         queryset=Property.objects.all(),
-        write_only=True,
+    )
+
+    owner = serializers.IntegerField(
+        source="property.owner_id",
+        read_only=True,
+    )
+
+    owner_details = OwnerPublicSerializer(
+        source="property.owner",
+        read_only=True,
+    )
+
+    property_type = PropertyTypeSerializer(
+        source="property.property_type",
+        read_only=True,
+    )
+
+    location = LocationSerializer(
+        source="property.location",
+        read_only=True,
     )
 
     property_details = ListingPropertySerializer(
@@ -246,6 +271,10 @@ class PropertyListingSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "property",
+            "owner",
+            "owner_details",
+            "property_type",
+            "location",
             "property_details",
             "title",
             "listing_type",
@@ -260,6 +289,10 @@ class PropertyListingSerializer(serializers.ModelSerializer):
 
         read_only_fields = (
             "id",
+            "owner",
+            "owner_details",
+            "property_type",
+            "location",
             "property_details",
             "published_at",
             "created_at",
